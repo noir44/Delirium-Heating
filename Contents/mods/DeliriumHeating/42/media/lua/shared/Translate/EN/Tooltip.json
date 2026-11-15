@@ -1,0 +1,8 @@
+{
+	"Tooltip_DelHeat_Pipe": "Lies on the ground and carries the water. Laid one by one or as a run between two clicks. Right-click the ground: Heating. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Radiator": "Warms a room when a heat unit with hot water is within range. Needs no pipe of its own. Right-click the ground: Heating. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Inlet": "Stands at a house on the end of a pipe and feeds the radiators around it. Right-click the ground: Heating. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Pump": "Sends the water further along the pipe. Needs electricity. Right-click the ground: Heating. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Intake": "2x2 cells by a river or a lake: pumps water into the pipes to a boiler house. Needs electricity. Right-click the ground: Heating. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Boiler": "2x3 cells: burns fuel and heats the water for a whole neighbourhood. Right-click the ground: Heating. A pipe wrench is needed."
+}

@@ -1,0 +1,8 @@
+{
+	"DelHeat.Pipe": "Труба отопления",
+	"DelHeat.Radiator": "Радиатор",
+	"DelHeat.Inlet": "Тепловой узел",
+	"DelHeat.Pump": "Насосная станция",
+	"DelHeat.Intake": "Комплект водозабора",
+	"DelHeat.Boiler": "Комплект котельной"
+}

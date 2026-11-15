@@ -1,11 +1,13 @@
 # Turns the renders of render_heat.py (art/raw, 4x) into the 2x frames
 # art/frames/delheat_01_<index>.png, writes art/tiles.json for
-# tools/TilePack/build-tilepack.ps1, a preview sheet and the poster.
+# tools/TilePack/build-tilepack.ps1, the item icons, a preview sheet and the
+# poster.
 #   python art/cut_heat.py
 #
-# One-cell sprites are a plain crop. A boiler is one render of the 3x3 cells
-# around its anchor plus a mask of which cell every pixel stands on; the
-# frame of a cell keeps only its own pixels (as in Delirium-Mines).
+# One-cell sprites are a plain crop. A boiler or an intake is one render of
+# the 3x3 cells around its anchor plus a mask of which cell every pixel
+# stands on; the frame of a cell keeps only its own pixels (as in
+# Delirium-Mines).
 import json
 import os
 
@@ -15,6 +17,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, "raw")
 FRAMES = os.path.join(HERE, "frames")
+TEXTURES = os.path.join(HERE, "..", "Contents", "mods", "DeliriumHeating", "42", "media", "textures")
 TILESET = "delheat_01"
 SCALE = 4
 # The ground under an object is a shadow catcher: its shadow is black with
@@ -22,8 +25,10 @@ SCALE = 4
 SHADOW = 0.45
 
 PUMP = 16
+INLET = 17
 RADIATOR = {"N": 18, "W": 19, "S": 20, "E": 21}
-BOILER = {"S": (22, 3, 2), "E": (28, 2, 3)}     # first index, cells wide, cells deep
+# render name: first index, cells wide, cells deep
+STRUCTURES = {"boiler_S": (22, 3, 2), "boiler_E": (28, 2, 3), "intake": (34, 2, 2)}
 SOLID = {"solidtrans": "", "BlocksPlacement": ""}
 
 
@@ -75,41 +80,38 @@ def window(dx, dy):
     return 128 + (dx - dy) * 64, (dx + dy) * 32
 
 
-def boiler(facing):
-    first, wide, deep = BOILER[facing]
+def structure(name):
+    first, wide, deep = STRUCTURES[name]
     area = 384
-    color = load(f"boiler_{facing}_color.png")
+    color = load(name + "_color.png")
     pm = downsample(soften_shadow(color))
-    mask = load(f"boiler_{facing}_mask.png")
-    # The ground around the boiler belongs to no cell: its shadow is dropped.
+    mask = load(name + "_mask.png")
+    # The ground around the structure belongs to no cell: its shadow is dropped.
     mask[..., 3] = np.where(is_shadow(color) > 0.5, 0, mask[..., 3])
     col = np.clip(np.rint(mask[..., 0] * 2), 0, 2).astype(int)
     row = np.clip(np.rint(mask[..., 1] * 2), 0, 2).astype(int)
     ids = np.where(mask[..., 3] > 0.5, row * 3 + col, -1)
     votes = np.stack([(ids == k).reshape(area, SCALE, area, SCALE).sum(axis=(1, 3)) for k in range(9)])
     owner = np.where(votes.max(axis=0) > 0, votes.argmax(axis=0), -1)
-    lost = 0
-    for dy in range(deep):
-        for dx in range(wide):
-            x0, y0 = window(dx, dy)
-            win = pm[y0:y0 + 256, x0:x0 + 128].copy()
-            win[owner[y0:y0 + 256, x0:x0 + 128] != dy * 3 + dx] = 0
-            save(win, first + dy * wide + dx)
     inside = np.zeros((area, area), bool)
     for dy in range(deep):
         for dx in range(wide):
             x0, y0 = window(dx, dy)
-            inside[y0:y0 + 256, x0:x0 + 128] |= owner[y0:y0 + 256, x0:x0 + 128] == dy * 3 + dx
-    lost = int(((owner >= 0) & ~inside).sum())
-    print("boiler", facing, "solid pixels outside their cell's frame:", lost)
+            win = pm[y0:y0 + 256, x0:x0 + 128].copy()
+            mine = owner[y0:y0 + 256, x0:x0 + 128] == dy * 3 + dx
+            win[~mine] = 0
+            inside[y0:y0 + 256, x0:x0 + 128] |= mine
+            save(win, first + dy * wide + dx)
+    # Mostly silhouette fringe whose mask sample hit the ground behind.
+    print(name, "pixels outside their cell's frame:", int(((owner >= 0) & ~inside).sum()))
 
 
 def frame(index):
     return Image.open(os.path.join(FRAMES, f"{TILESET}_{index}.png"))
 
 
-def assemble_boiler(facing):
-    first, wide, deep = BOILER[facing]
+def assemble(name):
+    first, wide, deep = STRUCTURES[name]
     img = Image.new("RGBA", (384, 384), (0, 0, 0, 0))
     for dy in range(deep):
         for dx in range(wide):
@@ -119,25 +121,43 @@ def assemble_boiler(facing):
 
 def scene():
     # A little network drawn the way the game would: cells back to front.
+    # The main ends in a heat unit; the radiators stand apart from the pipes.
     cells = {}
 
     def put(x, y, *indices):
         cells.setdefault((x, y), []).extend(indices)
 
     nodes = {(x, 3) for x in range(0, 7)} | {(3, y) for y in range(0, 7)} | {(6, y) for y in range(3, 6)}
-    devices = {(3, 0): RADIATOR["N"], (6, 5): RADIATOR["E"], (0, 3): RADIATOR["W"], (3, 6): RADIATOR["S"], (5, 3): PUMP}
+    devices = {(6, 5): INLET, (4, 3): PUMP}
     for (x, y) in nodes:
         mask = sum(bit for bit, (dx, dy) in ((1, (0, -1)), (2, (1, 0)), (4, (0, 1)), (8, (-1, 0)))
                    if (x + dx, y + dy) in nodes)
         put(x, y, mask)
         if (x, y) in devices:
             put(x, y, devices[(x, y)])
-    w, h = 7 * 128 + 64, 7 * 64 + 256
+    put(5, 7, RADIATOR["N"])
+    put(8, 6, RADIATOR["E"])
+    put(4, 5, RADIATOR["W"])
+    put(7, 8, RADIATOR["S"])
+    w, h = 9 * 128 + 64, 9 * 64 + 256
     img = Image.new("RGBA", (w, h), (74, 96, 58, 255))
     for (x, y) in sorted(cells, key=lambda c: (c[0] + c[1], c[0])):
         for index in cells[(x, y)]:
-            img.alpha_composite(frame(index), (w // 2 - 64 + (x - y) * 64, 64 + (x + y) * 32))
+            img.alpha_composite(frame(index), (w // 2 - 64 + (x - y) * 64, 32 + (x + y) * 32))
     return img
+
+
+def icon(img, name):
+    # Item icon: the object without its shadow, squared, 32x32.
+    arr = np.asarray(img.convert("RGBA")).copy()
+    ys, xs = np.nonzero(arr[..., 3] > 150)
+    arr[..., 3] = np.where(arr[..., 3] > 110, arr[..., 3], 0)
+    crop = Image.fromarray(arr, "RGBA").crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+    side = max(crop.size)
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.alpha_composite(crop, ((side - crop.width) // 2, (side - crop.height) // 2))
+    os.makedirs(TEXTURES, exist_ok=True)
+    square.resize((32, 32), Image.LANCZOS).save(os.path.join(TEXTURES, f"Item_DelHeat{name}.png"))
 
 
 def tiles_json():
@@ -149,9 +169,10 @@ def tiles_json():
     for mask in range(16):
         add(mask)
     add(PUMP, SOLID)
+    add(INLET, SOLID)
     for index in RADIATOR.values():
         add(index)
-    for first, wide, deep in BOILER.values():
+    for first, wide, deep in STRUCTURES.values():
         for cell in range(wide * deep):
             add(first + cell, SOLID)
     spec = {"pack": "delheat", "tileset": TILESET, "columns": 8, "rows": 8, "tiles": tiles}
@@ -164,21 +185,29 @@ def main():
     for mask in range(16):
         single(f"pipe_{mask}", mask)
     single("pump", PUMP)
+    single("inlet", INLET)
     for facing, index in RADIATOR.items():
         single("radiator_" + facing, index)
-    for facing in BOILER:
-        boiler(facing)
+    for name in STRUCTURES:
+        structure(name)
     tiles_json()
 
+    icon(frame(10), "Pipe")
+    icon(frame(RADIATOR["N"]), "Radiator")
+    icon(frame(INLET), "Inlet")
+    icon(frame(PUMP), "Pump")
+    icon(assemble("intake"), "Intake")
+    icon(assemble("boiler_S"), "Boiler")
+
     net = scene()
-    sheet = Image.new("RGBA", (net.width + 2 * 384, max(net.height, 384)), (74, 96, 58, 255))
+    sheet = Image.new("RGBA", (net.width + 3 * 384, max(net.height, 384)), (74, 96, 58, 255))
     sheet.alpha_composite(net)
-    sheet.alpha_composite(assemble_boiler("S"), (net.width, 0))
-    sheet.alpha_composite(assemble_boiler("E"), (net.width + 384, 0))
+    for i, name in enumerate(STRUCTURES):
+        sheet.alpha_composite(assemble(name), (net.width + i * 384, 0))
     sheet.save(os.path.join(HERE, "preview_sheet.png"))
 
     poster = Image.new("RGBA", (384, 384), (52, 66, 46, 255))
-    poster.alpha_composite(assemble_boiler("S"), (0, 40))
+    poster.alpha_composite(assemble("boiler_S"), (0, 40))
     poster.resize((256, 256), Image.LANCZOS).convert("RGB").save(os.path.join(HERE, "poster.png"))
     print("frames:", len(os.listdir(FRAMES)))
 

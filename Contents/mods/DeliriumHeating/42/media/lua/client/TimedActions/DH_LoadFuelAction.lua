@@ -10,12 +10,12 @@ require "DH_Shared"
 DH_LoadFuelAction = ISBaseTimedAction:derive("DH_LoadFuelAction")
 
 function DH_LoadFuelAction:centre()
-	local size = DelHeat.BOILER_SIZE[self.node.facing] or DelHeat.BOILER_SIZE.S
+	local size = DelHeat.sizeOf(DelHeat.BOILER, self.node.facing)
 	return self.node.x + size.w / 2, self.node.y + size.h / 2
 end
 
 function DH_LoadFuelAction:isValid()
-	local distance = DelHeat.boilerDistance(self.node.x, self.node.y, self.node.facing,
+	local distance = DelHeat.distanceTo(self.node.x, self.node.y, DelHeat.sizeOf(DelHeat.BOILER, self.node.facing),
 		self.character:getX(), self.character:getY())
 	return distance <= DelHeat.REACH
 end

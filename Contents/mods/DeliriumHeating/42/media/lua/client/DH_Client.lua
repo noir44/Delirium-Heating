@@ -1,15 +1,17 @@
 -- Delirium Heating - client: the heat sources at the hot radiators, the
--- server's replies and the context menu (boiler: fire, fuel; admin: put
--- down, lay pipes, remove).
+-- server's replies and the context menu (boiler: fire, fuel; building and
+-- taking apart with the items; admin: the same for free).
 
 if isServer() then return end
 
 require "ISUI/ISToolTip"
 require "DH_Shared"
 require "TimedActions/DH_LoadFuelAction"
+require "TimedActions/DH_BuildAction"
 
 local MODULE = DelHeat.MODULE
-local PIPE, RADIATOR, PUMP, BOILER = DelHeat.PIPE, DelHeat.RADIATOR, DelHeat.PUMP, DelHeat.BOILER
+local PIPE, PUMP, INLET = DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET
+local RADIATOR, BOILER, INTAKE = DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE
 
 function DelHeat.send(command, args)
 	local player = getPlayer()
@@ -22,11 +24,12 @@ end
 -- E:\mods\CLAUDE.md), so it is asked again until an answer arrives.
 -- ---------------------------------------------------------------------------
 
--- levels = { ["x,y,z"] = 0..LEVELS } for every radiator the water reaches;
--- status = { boilers = { [anchor] = { facing, fuel, temp, on, load } },
---            pumps = { [cell] = works } }
+-- levels = { ["x,y,z"] = 0..LEVELS } for every radiator a heat unit serves;
+-- status = { boilers = { [anchor] = { facing, fuel, water, temp, on, load, supply } },
+--            pumps = { [cell] = works }, intakes = { [anchor] = works },
+--            inlets = { [cell] = true } }
 local levels = {}
-local status = { boilers = {}, pumps = {} }
+local status = { boilers = {}, pumps = {}, intakes = {}, inlets = {} }
 local received = false
 
 local function request()
@@ -93,21 +96,34 @@ Events.EveryOneMinute.Add(everyMinute)
 
 local Replies = {}
 
-function Replies.notify(args)
+local function halo(text)
 	local player = getPlayer()
-	if not player or type(args.key) ~= "string" then return end
+	if player then player:setHaloNote(text, 255, 255, 255, 300) end
+end
+
+function Replies.notify(args)
+	if type(args.key) ~= "string" then return end
 	local arg1, arg2 = args.arg1, args.arg2
 	-- An argument may itself be a translation key (why a pipe run stopped).
 	if type(arg2) == "string" and string.sub(arg2, 1, 5) == "IGUI_" then arg2 = getText(arg2) end
-	local text
 	if arg2 ~= nil then
-		text = getText(args.key, tostring(arg1), tostring(arg2))
+		halo(getText(args.key, tostring(arg1), tostring(arg2)))
 	elseif arg1 ~= nil then
-		text = getText(args.key, tostring(arg1))
+		halo(getText(args.key, tostring(arg1)))
 	else
-		text = getText(args.key)
+		halo(getText(args.key))
 	end
-	player:setHaloNote(text, 255, 255, 255, 300)
+end
+
+-- { any, heat, water }: how much further the boiler's and the intake's
+-- water would go from the probed cell.
+function Replies.probe(args)
+	if not args.any then return halo(getText("IGUI_DelHeat_ProbeNothing")) end
+	local heat = args.heat and getText("IGUI_DelHeat_ProbeHeatYes", tostring(args.heat))
+		or getText("IGUI_DelHeat_ProbeHeatNo")
+	local water = args.water and getText("IGUI_DelHeat_ProbeWaterYes", tostring(args.water))
+		or getText("IGUI_DelHeat_ProbeWaterNo")
+	halo(heat .. " | " .. water)
 end
 
 function Replies.heat(args)
@@ -121,10 +137,10 @@ function Replies.heat(args)
 end
 
 function Replies.status(args)
-	status = {
-		boilers = type(args.boilers) == "table" and args.boilers or {},
-		pumps = type(args.pumps) == "table" and args.pumps or {},
-	}
+	status = {}
+	for _, name in ipairs({ "boilers", "pumps", "intakes", "inlets" }) do
+		status[name] = type(args[name]) == "table" and args[name] or {}
+	end
 end
 
 local function onServerCommand(module, command, args)
@@ -140,6 +156,7 @@ Events.OnServerCommand.Add(onServerCommand)
 
 local RED = " <RGB:1,0.4,0.4> "
 local GREEN = " <RGB:0.5,1,0.5> "
+local WHITE = " <RGB:1,1,1> "
 
 local function tooltip(lines)
 	local tip = ISToolTip:new()
@@ -156,17 +173,24 @@ end
 local function boilerLines(record)
 	if not record then return { getText("IGUI_DelHeat_NoData") } end
 	local lines = {}
-	local fuel = tonumber(record.fuel) or 0
-	local burning = record.on and fuel > 0
-	if burning then
-		table.insert(lines, GREEN .. getText("IGUI_DelHeat_Burning"))
-	elseif record.on then
+	local fuel, water = tonumber(record.fuel) or 0, tonumber(record.water) or 0
+	if not record.on then
+		table.insert(lines, getText("IGUI_DelHeat_Off"))
+	elseif water <= 0 then
+		table.insert(lines, RED .. getText("IGUI_DelHeat_OutOfWater"))
+	elseif fuel <= 0 then
 		table.insert(lines, RED .. getText("IGUI_DelHeat_OutOfFuel"))
 	else
-		table.insert(lines, getText("IGUI_DelHeat_Off"))
+		table.insert(lines, GREEN .. getText("IGUI_DelHeat_Burning"))
 	end
-	table.insert(lines, " <RGB:1,1,1> " .. getText("IGUI_DelHeat_Water", tostring(record.temp or 0)))
+	table.insert(lines, WHITE .. getText("IGUI_DelHeat_Temp", tostring(record.temp or 0)))
 	table.insert(lines, getText("IGUI_DelHeat_Fuel", number1(fuel), tostring(DelHeat.fuelCapacity())))
+	table.insert(lines, getText("IGUI_DelHeat_Water", tostring(water), tostring(DelHeat.waterCapacity())))
+	if (tonumber(record.supply) or 0) > 0 then
+		table.insert(lines, GREEN .. getText("IGUI_DelHeat_SupplyYes") .. WHITE)
+	else
+		table.insert(lines, RED .. getText("IGUI_DelHeat_SupplyNo") .. WHITE)
+	end
 	local load = tonumber(record.load) or 0
 	table.insert(lines, getText("IGUI_DelHeat_Radiators", tostring(load)))
 	local perHour = DelHeat.burnPerHour() + DelHeat.burnPerRadiator() * load
@@ -176,18 +200,29 @@ local function boilerLines(record)
 	return lines
 end
 
-local function radiatorLines(key)
-	local level = levels[key]
-	if level == nil then return { RED .. getText("IGUI_DelHeat_RadiatorDry") } end
-	if level <= 0 then return { getText("IGUI_DelHeat_RadiatorCold") } end
-	local percent = math.floor(level * 100 / DelHeat.LEVELS + 0.5)
-	return { GREEN .. getText("IGUI_DelHeat_RadiatorHot", tostring(percent)) }
-end
-
-local function pumpLines(key)
-	if status.pumps[key] == nil then return { getText("IGUI_DelHeat_NoData") } end
-	if status.pumps[key] then return { GREEN .. getText("IGUI_DelHeat_PumpWorks") } end
-	return { RED .. getText("IGUI_DelHeat_PumpNoPower") }
+-- What the tooltip of a thing says; nil for a plain pipe.
+local function infoLines(node)
+	if node.kind == BOILER then return boilerLines(status.boilers[node.key]) end
+	if node.kind == RADIATOR then
+		local level = levels[node.key]
+		if level == nil then return { RED .. getText("IGUI_DelHeat_RadiatorDry") } end
+		if level <= 0 then return { getText("IGUI_DelHeat_RadiatorCold") } end
+		return { GREEN .. getText("IGUI_DelHeat_RadiatorHot", tostring(math.floor(level * 100 / DelHeat.LEVELS + 0.5))) }
+	end
+	if node.kind == PUMP then
+		if status.pumps[node.key] then return { GREEN .. getText("IGUI_DelHeat_Works") } end
+		return { RED .. getText("IGUI_DelHeat_PumpNoPower") }
+	end
+	if node.kind == INTAKE then
+		if status.intakes[node.key] then return { GREEN .. getText("IGUI_DelHeat_Works") } end
+		return { RED .. getText("IGUI_DelHeat_IntakeNoPower") }
+	end
+	if node.kind == INLET then
+		local radius = getText("IGUI_DelHeat_InletRadius", tostring(DelHeat.inletRadius()))
+		if status.inlets[node.key] then return { GREEN .. getText("IGUI_DelHeat_InletFed"), WHITE .. radius } end
+		return { RED .. getText("IGUI_DelHeat_InletDry"), WHITE .. radius }
+	end
+	return nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -225,105 +260,161 @@ local function loadFuel(player, node, square, ids)
 end
 
 -- ---------------------------------------------------------------------------
--- Context menu
+-- Building. An admin's command goes straight to the server; a player walks
+-- up and works for a while first (the server checks the tool, the item and
+-- the distance again).
 -- ---------------------------------------------------------------------------
 
--- The admin's first click of a pipe run.
-local lineStart = nil
+local TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800 }
 
-local function boilerMenu(context, player, node, square)
-	local record = status.boilers[node.key]
-	local parent = context:addOption(getText("IGUI_DelHeat_Boiler"))
-	parent.toolTip = tooltip(boilerLines(record))
-	local sub = ISContextMenu:getNew(context)
-	context:addSubMenu(parent, sub)
-	local args = { x = node.x, y = node.y, z = node.z }
-
-	local on = record and record.on
-	local switch = sub:addOption(getText(on and "IGUI_DelHeat_SwitchOff" or "IGUI_DelHeat_SwitchOn"), MODULE,
-		function() DelHeat.send("toggle", args) end)
-	switch.toolTip = tooltip(boilerLines(record))
-
-	local groups, all = fuelGroups(player)
-	local fuelOption = sub:addOption(getText("IGUI_DelHeat_LoadFuel"))
-	if #groups == 0 then
-		fuelOption.notAvailable = true
-		fuelOption.toolTip = tooltip({ getText("IGUI_DelHeat_NoFuelItems") })
-		return
-	end
-	local fuelMenu = ISContextMenu:getNew(sub)
-	sub:addSubMenu(fuelOption, fuelMenu)
-	if #groups > 1 then
-		fuelMenu:addOption(getText("IGUI_DelHeat_LoadAll"), player, loadFuel, node, square, all)
-	end
-	for _, group in ipairs(groups) do
-		local name = getText("IGUI_DelHeat_LoadGroup", group.name, tostring(#group.ids), number1(group.units))
-		fuelMenu:addOption(name, player, loadFuel, node, square, group.ids)
+local function act(player, square, command, args, time)
+	if DelHeat.isAdmin(player) then
+		DelHeat.send(command, args)
+	elseif luautils.walkAdj(player, square, true) then
+		ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time))
 	end
 end
 
-local function adminMenu(context, square, node)
-	local parent = context:addOption(getText("IGUI_DelHeat_Admin"))
+-- The first click of a pipe run.
+local lineStart = nil
+
+-- Lazily made submenu: a thing with nothing to offer stays a plain line.
+local function submenuOf(context, parent)
+	local sub
+	return function()
+		if not sub then
+			sub = ISContextMenu:getNew(context)
+			context:addSubMenu(parent, sub)
+		end
+		return sub
+	end
+end
+
+local function disable(option, key, arg)
+	option.notAvailable = true
+	option.toolTip = tooltip({ arg and getText(key, tostring(arg)) or getText(key) })
+end
+
+-- Run of pipes: start here / lay to here / take off to here.
+local function lineOptions(sub, player, square, admin, hasTool, pipes)
+	local x, y, z = square:getX(), square:getY(), square:getZ()
+	sub:addOption(getText("IGUI_DelHeat_LineStart"), MODULE, function()
+		lineStart = { x = x, y = y, z = z }
+		player:setHaloNote(getText("IGUI_DelHeat_LineStartSet"), 255, 255, 255, 300)
+	end)
+	if not lineStart or lineStart.z ~= z then return end
+	local run = { x1 = lineStart.x, y1 = lineStart.y, x2 = x, y2 = y, z = z }
+	local length = math.abs(x - lineStart.x) + math.abs(y - lineStart.y) + 1
+	local lay = sub:addOption(getText("IGUI_DelHeat_LineEnd", tostring(length)), MODULE, function()
+		act(player, square, "line", run, math.min(1500, 60 + 40 * (admin and length or math.min(length, pipes))))
+		-- The next run starts where this one ended.
+		lineStart = { x = x, y = y, z = z }
+	end)
+	local take = sub:addOption(getText("IGUI_DelHeat_LineRemove", tostring(length)), MODULE, function()
+		act(player, square, "unline", run, math.min(1500, 60 + 30 * length))
+		lineStart = nil
+	end)
+	if length > DelHeat.MAX_LINE then
+		disable(lay, "IGUI_DelHeat_LineTooLong", DelHeat.MAX_LINE)
+		disable(take, "IGUI_DelHeat_LineTooLong", DelHeat.MAX_LINE)
+	elseif not admin and not hasTool then
+		disable(lay, "IGUI_DelHeat_NeedTool")
+		disable(take, "IGUI_DelHeat_NeedTool")
+	elseif not admin and pipes <= 0 then
+		disable(lay, "IGUI_DelHeat_NeedItem")
+	end
+end
+
+-- Right click on one of our things.
+local function nodeMenu(context, player, node, square, admin, canBuild, hasTool)
+	local name = DelHeat.NAME[node.kind]
+	local parent = context:addOption(getText("IGUI_DelHeat_Kind_" .. name))
+	local lines = infoLines(node)
+	if lines then parent.toolTip = tooltip(lines) end
+	local sub = submenuOf(context, parent)
+	local args = { x = square:getX(), y = square:getY(), z = square:getZ() }
+
+	if node.kind == BOILER then
+		local record = status.boilers[node.key]
+		local on = record and record.on
+		sub():addOption(getText(on and "IGUI_DelHeat_SwitchOff" or "IGUI_DelHeat_SwitchOn"), MODULE,
+			function() DelHeat.send("toggle", args) end)
+		local groups, all = fuelGroups(player)
+		local fuelOption = sub():addOption(getText("IGUI_DelHeat_LoadFuel"))
+		if #groups == 0 then
+			disable(fuelOption, "IGUI_DelHeat_NoFuelItems")
+		else
+			local fuelMenu = ISContextMenu:getNew(sub())
+			sub():addSubMenu(fuelOption, fuelMenu)
+			if #groups > 1 then
+				fuelMenu:addOption(getText("IGUI_DelHeat_LoadAll"), player, loadFuel, node, square, all)
+			end
+			for _, group in ipairs(groups) do
+				local text = getText("IGUI_DelHeat_LoadGroup", group.name, tostring(#group.ids), number1(group.units))
+				fuelMenu:addOption(text, player, loadFuel, node, square, group.ids)
+			end
+		end
+		if admin then
+			sub():addOption(getText("IGUI_DelHeat_FillFuel"), MODULE, function()
+				DelHeat.send("fill", { x = args.x, y = args.y, z = args.z, what = "fuel" })
+			end)
+			sub():addOption(getText("IGUI_DelHeat_FillWater"), MODULE, function()
+				DelHeat.send("fill", { x = args.x, y = args.y, z = args.z, what = "water" })
+			end)
+		end
+	end
+
+	if node.kind ~= RADIATOR then
+		sub():addOption(getText("IGUI_DelHeat_Probe"), MODULE, function() DelHeat.send("probe", args) end)
+	end
+	if not canBuild then return end
+	if node.kind == PIPE or node.kind == PUMP or node.kind == INLET then
+		lineOptions(sub(), player, square, admin, hasTool, DelHeat.countOf(player, DelHeat.ITEM.pipe))
+	end
+	local remove = sub():addOption(getText(admin and "IGUI_DelHeat_Remove" or "IGUI_DelHeat_Dismantle"), MODULE,
+		function() act(player, square, "remove", args, TIME[name] or 200) end)
+	if not admin and not hasTool then disable(remove, "IGUI_DelHeat_NeedTool") end
+end
+
+-- Right click on bare ground with something to build.
+local function buildMenu(context, player, square, admin, hasTool)
+	local have = {}
+	local any = admin
+	for name, itemType in pairs(DelHeat.ITEM) do
+		have[name] = DelHeat.countOf(player, itemType)
+		if have[name] > 0 then any = true end
+	end
+	if not any then return end
+	local parent = context:addOption(getText("IGUI_DelHeat_Build"))
 	local sub = ISContextMenu:getNew(context)
 	context:addSubMenu(parent, sub)
 	local x, y, z = square:getX(), square:getY(), square:getZ()
-	local args = { x = x, y = y, z = z }
 
-	if not node then
-		sub:addOption(getText("IGUI_DelHeat_PlacePipe"), MODULE, function()
-			DelHeat.send("place", { x = x, y = y, z = z, kind = "pipe" })
+	local function place(menu, textKey, name, facing)
+		if not admin and have[name] <= 0 then return end
+		local option = menu:addOption(getText(textKey), MODULE, function()
+			act(player, square, "place", { x = x, y = y, z = z, kind = name, facing = facing }, TIME[name])
 		end)
+		if not admin and not hasTool then disable(option, "IGUI_DelHeat_NeedTool") end
 	end
-	sub:addOption(getText("IGUI_DelHeat_LineStart"), MODULE, function()
-		lineStart = { x = x, y = y, z = z }
-		getPlayer():setHaloNote(getText("IGUI_DelHeat_LineStartSet"), 255, 255, 255, 300)
-	end)
-	if lineStart and lineStart.z == z then
-		local run = { x1 = lineStart.x, y1 = lineStart.y, x2 = x, y2 = y, z = z }
-		local length = math.abs(x - lineStart.x) + math.abs(y - lineStart.y) + 1
-		local lay = sub:addOption(getText("IGUI_DelHeat_LineEnd", tostring(length)), MODULE, function()
-			DelHeat.send("line", run)
-			-- The next run starts where this one ended.
-			lineStart = { x = x, y = y, z = z }
-		end)
-		local take = sub:addOption(getText("IGUI_DelHeat_LineRemove", tostring(length)), MODULE, function()
-			DelHeat.send("unline", run)
-			lineStart = nil
-		end)
-		if length > DelHeat.MAX_LINE then
-			lay.notAvailable = true
-			take.notAvailable = true
+
+	local function placeFacing(textKey, name, facings, prefix)
+		if not admin and have[name] <= 0 then return end
+		local option = sub:addOption(getText(textKey))
+		local menu = ISContextMenu:getNew(sub)
+		sub:addSubMenu(option, menu)
+		for _, facing in ipairs(facings) do
+			place(menu, prefix .. facing, name, facing)
 		end
 	end
 
-	if not node then
-		local radiator = sub:addOption(getText("IGUI_DelHeat_PlaceRadiator"))
-		local radiatorMenu = ISContextMenu:getNew(sub)
-		sub:addSubMenu(radiator, radiatorMenu)
-		for _, facing in ipairs(DelHeat.RADIATOR_FACINGS) do
-			radiatorMenu:addOption(getText("IGUI_DelHeat_Wall_" .. facing), MODULE, function()
-				DelHeat.send("place", { x = x, y = y, z = z, kind = "radiator", facing = facing })
-			end)
-		end
-		sub:addOption(getText("IGUI_DelHeat_PlacePump"), MODULE, function()
-			DelHeat.send("place", { x = x, y = y, z = z, kind = "pump" })
-		end)
-		local boiler = sub:addOption(getText("IGUI_DelHeat_PlaceBoiler"))
-		local boilerMenu2 = ISContextMenu:getNew(sub)
-		sub:addSubMenu(boiler, boilerMenu2)
-		for _, facing in ipairs(DelHeat.BOILER_FACINGS) do
-			boilerMenu2:addOption(getText("IGUI_DelHeat_Front_" .. facing), MODULE, function()
-				DelHeat.send("place", { x = x, y = y, z = z, kind = "boiler", facing = facing })
-			end)
-		end
-		return
-	end
-
-	sub:addOption(getText("IGUI_DelHeat_Probe"), MODULE, function() DelHeat.send("probe", args) end)
-	if node.kind == BOILER then
-		sub:addOption(getText("IGUI_DelHeat_Refuel"), MODULE, function() DelHeat.send("refuel", args) end)
-	end
-	sub:addOption(getText("IGUI_DelHeat_Remove"), MODULE, function() DelHeat.send("remove", args) end)
+	place(sub, "IGUI_DelHeat_PlacePipe", "pipe")
+	if admin or have.pipe > 0 then lineOptions(sub, player, square, admin, hasTool, have.pipe) end
+	placeFacing("IGUI_DelHeat_PlaceRadiator", "radiator", DelHeat.RADIATOR_FACINGS, "IGUI_DelHeat_Wall_")
+	place(sub, "IGUI_DelHeat_PlaceInlet", "inlet")
+	place(sub, "IGUI_DelHeat_PlacePump", "pump")
+	place(sub, "IGUI_DelHeat_PlaceIntake", "intake")
+	placeFacing("IGUI_DelHeat_PlaceBoiler", "boiler", DelHeat.BOILER_FACINGS, "IGUI_DelHeat_Front_")
 end
 
 local function onFill(playerNum, context, worldobjects, test)
@@ -342,16 +433,13 @@ local function onFill(playerNum, context, worldobjects, test)
 	end
 	if not square then return end
 
-	if node and node.kind == BOILER then
-		boilerMenu(context, player, node, square)
-	elseif node and node.kind == RADIATOR then
-		local option = context:addOption(getText("IGUI_DelHeat_Radiator"))
-		option.toolTip = tooltip(radiatorLines(node.key))
-	elseif node and node.kind == PUMP then
-		local option = context:addOption(getText("IGUI_DelHeat_Pump"))
-		option.toolTip = tooltip(pumpLines(node.key))
+	local admin = DelHeat.isAdmin(player)
+	local canBuild = admin or DelHeat.playersBuild()
+	local hasTool = admin or DelHeat.hasTool(player)
+	if node then
+		nodeMenu(context, player, node, square, admin, canBuild, hasTool)
+	elseif canBuild then
+		buildMenu(context, player, square, admin, hasTool)
 	end
-
-	if DelHeat.isAdmin(player) then adminMenu(context, square, node) end
 end
 Events.OnFillWorldObjectContextMenu.Add(onFill)

@@ -1,5 +1,6 @@
 # Models and renders every Delirium Heating sprite with the PZ camera:
-# 16 pipes (by neighbour mask), the pump, 4 radiators, 2 boiler houses.
+# 16 pipes (by neighbour mask), the pump, the heat unit, 4 radiators, 2 boiler
+# houses, the water intake.
 #   blender --background --factory-startup --python render_heat.py -- <out_dir> [name ...]
 # Writes <out_dir>/<name>_color.png (4x) and, for the boilers, <name>_mask.png
 # (which cell every pixel stands on); cut_heat.py turns them into the frames.
@@ -213,12 +214,14 @@ def build_radiator(degrees):
     cyl((x0 - 0.03, y, 0.19), (x1 + 0.03, y, 0.19), 0.04, M["cream"], 20)
     for x in (x0 + step * 0.5, x1 - step * 0.5):
         box(x - 0.02, x + 0.02, y - 0.05, y + 0.05, 0.0, 0.16, M["dark"])
-    # Valve and feed: from the pipe in the middle of the cell to the radiator.
+    # Valve, and the feed and return going down into the floor: the pipes
+    # from the heat unit run out of sight.
     cyl((x1 + 0.03, y, 0.19), (x1 + 0.09, y, 0.19), 0.03, M["dark"], 16)
     ball((x1 + 0.09, y, 0.19), 0.04, M["red"])
-    cyl((0.5, -0.5, 0.06), (0.5, y, 0.06), 0.032, M["steel"], 16)
-    cyl((0.5, y, 0.06), (0.5, y, 0.17), 0.032, M["steel"], 16)
-    ball((0.5, y, 0.06), 0.032, M["steel"])
+    cyl((x1 + 0.09, y, 0.0), (x1 + 0.09, y, 0.19), 0.026, M["steel"], 16)
+    cyl((x0 - 0.03, y, 0.19), (x0 - 0.08, y, 0.19), 0.03, M["dark"], 16)
+    ball((x0 - 0.08, y, 0.19), 0.03, M["steel"])
+    cyl((x0 - 0.08, y, 0.0), (x0 - 0.08, y, 0.19), 0.026, M["steel"], 16)
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
@@ -244,6 +247,70 @@ def build_pump():
     cyl((0.86, y, z), (0.88, y, z), 0.105, M["dark"], 20)
     cyl((0.685, y, z + 0.18), (0.685, y, z + 0.30), 0.07, M["steel"], 20)
     cyl((0.685, y, z + 0.30), (0.685, y, z + 0.32), 0.10, M["dark"], 20)
+
+
+def build_inlet():
+    # Heat unit: a cabinet standing on the end of the main, with the valves
+    # on top and the house lines going down into the ground.
+    y = -0.5
+    box(0.22, 0.78, -0.74, -0.26, 0.0, 0.06, M["concrete"])
+    for x in (0.39, 0.61):
+        cyl((x, y, Z_PIPE), (x, y, 0.32), 0.05, M["steel"], 20)
+    box(0.29, 0.71, -0.63, -0.37, 0.30, 0.92, M["green"])
+    box(0.32, 0.68, -0.645, -0.63, 0.35, 0.87, M["steel"])
+    box(0.63, 0.66, -0.655, -0.645, 0.55, 0.67, M["dark"])
+    cyl((0.42, -0.66, 0.76), (0.42, -0.645, 0.76), 0.055, M["white"], 24)
+    cyl((0.42, -0.662, 0.76), (0.42, -0.66, 0.76), 0.062, M["dark"], 24)
+    for x in (0.40, 0.60):
+        cyl((x, y, 0.92), (x, y, 1.02), 0.02, M["steel"], 12)
+        cyl((x, y, 1.02), (x, y, 1.04), 0.075, M["red"], 24)
+    for dy, z in ((0.06, 0.62), (-0.06, 0.46)):
+        cyl((0.71, y + dy, z), (0.80, y + dy, z), 0.035, M["steel"], 16)
+        ball((0.80, y + dy, z), 0.035, M["steel"])
+        cyl((0.80, y + dy, z), (0.80, y + dy, 0.0), 0.035, M["steel"], 16)
+
+
+def build_intake():
+    # Water intake, x 0..2, y -2..0: a well with a hatch, the standpipe out
+    # of it, the pump with its motor, the control cabinet, the discharge.
+    box(0.05, 1.95, -1.95, -0.05, 0.0, 0.10, M["concrete"])
+    wx, wy = 0.62, -0.62
+    cyl((wx, wy, 0.10), (wx, wy, 0.60), 0.44, M["concrete"], 48)
+    cyl((wx, wy, 0.60), (wx, wy, 0.64), 0.38, M["dark"], 48)
+    box(wx - 0.16, wx + 0.16, wy - 0.42, wy - 0.36, 0.60, 0.66, M["steel"])
+    py, pz = -1.38, 0.50
+    cyl((wx, wy, 0.64), (wx, wy, 1.02), 0.085, M["steel"], 24)
+    ball((wx, wy, 1.02), 0.085, M["steel"])
+    cyl((wx, wy, 1.02), (wx, py, 1.02), 0.085, M["steel"], 24)
+    ball((wx, py, 1.02), 0.085, M["steel"])
+    cyl((wx, py, 1.02), (wx, py, pz), 0.085, M["steel"], 24)
+    cyl((wx, wy, 0.84), (wx, wy, 0.88), 0.12, M["dark"], 24)
+    # Pump casing, coupling, motor with fins.
+    box(0.40, 1.62, py - 0.27, py + 0.27, 0.10, 0.20, M["dark"])
+    cyl((0.50, py, pz), (0.74, py, pz), 0.30, M["red"], 48)
+    cyl((0.74, py, pz), (0.84, py, pz), 0.09, M["steel"], 20)
+    cyl((0.84, py, pz), (1.50, py, pz), 0.23, M["blue"], 48)
+    for i in range(9):
+        x = 0.90 + i * 0.065
+        cyl((x, py, pz), (x + 0.02, py, pz), 0.25, M["blue"], 48)
+    cyl((1.50, py, pz), (1.56, py, pz), 0.17, M["dark"], 32)
+    box(1.05, 1.27, py - 0.09, py + 0.09, pz + 0.21, pz + 0.31, M["dark"])
+    # Discharge: out of the casing, down, and along the slab to the south.
+    cyl((0.50, py, pz), (0.28, py, pz), 0.085, M["steel"], 24)
+    cyl((0.44, py, pz), (0.47, py, pz), 0.13, M["dark"], 24)
+    ball((0.28, py, pz), 0.085, M["steel"])
+    cyl((0.28, py, pz), (0.28, py, 0.10 + R_PIPE), 0.085, M["steel"], 24)
+    ball((0.28, py, 0.10 + R_PIPE), 0.085, M["steel"])
+    cyl((0.28, py, 0.10 + R_PIPE), (0.28, -1.95, 0.10 + R_PIPE), R_PIPE, M["steel"])
+    # Control cabinet on a stand, behind on the right.
+    for x in (1.44, 1.70):
+        box(x - 0.025, x + 0.025, -0.52, -0.47, 0.10, 0.50, M["dark"])
+    box(1.36, 1.78, -0.58, -0.40, 0.50, 1.12, M["green"])
+    box(1.39, 1.75, -0.595, -0.58, 0.54, 1.08, M["steel"])
+    cyl((1.48, -0.61, 0.96), (1.48, -0.595, 0.96), 0.05, M["white"], 24)
+    cyl((1.66, -0.61, 0.96), (1.66, -0.595, 0.96), 0.03, M["red"], 16)
+    cyl((1.57, -0.49, 0.50), (1.57, -0.49, 0.16), 0.03, M["dark"], 12)
+    cyl((1.57, -0.49, 0.16), (1.57, -1.11, 0.16), 0.03, M["dark"], 12)
 
 
 def build_boiler(facing):
@@ -457,8 +524,11 @@ materials()
 for mask in range(16):
     shoot("pipe_%d" % mask, lambda: build_pipe(mask), 256, 96)
 shoot("pump", build_pump, 256, 96)
+shoot("inlet", build_inlet, 256, 96)
 for facing, degrees in (("N", 0), ("W", 90), ("S", 180), ("E", 270)):
     shoot("radiator_" + facing, lambda: build_radiator(degrees), 256, 96)
-# The boilers: a 384x384 image of the 3x3 cells around, as in Delirium-Mines.
+# The boilers and the intake: a 384x384 image of the 3x3 cells around, as in
+# Delirium-Mines.
 for facing in ("S", "E"):
     shoot("boiler_" + facing, lambda: build_boiler(facing), 384, 32, True)
+shoot("intake", build_intake, 384, 32, True)

@@ -1,5 +1,14 @@
 VERSION = 1,
 
+option DelHeat.PlayersBuild
+{
+	type = boolean,
+	default = true,
+
+	page = DelHeat,
+	translation = DelHeat_PlayersBuild,
+}
+
 option DelHeat.FuelCapacity
 {
 	type = integer,
@@ -55,6 +64,61 @@ option DelHeat.CoolDownPerMinute
 	translation = DelHeat_CoolDownPerMinute,
 }
 
+option DelHeat.WaterCapacity
+{
+	type = integer,
+	min = 1,
+	max = 1000000,
+	default = 1000,
+
+	page = DelHeat,
+	translation = DelHeat_WaterCapacity,
+}
+
+option DelHeat.WaterPerHour
+{
+	type = double,
+	min = 0.0,
+	max = 10000.0,
+	default = 10.0,
+
+	page = DelHeat,
+	translation = DelHeat_WaterPerHour,
+}
+
+option DelHeat.WaterPerRadiator
+{
+	type = double,
+	min = 0.0,
+	max = 1000.0,
+	default = 0.5,
+
+	page = DelHeat,
+	translation = DelHeat_WaterPerRadiator,
+}
+
+option DelHeat.IntakeRate
+{
+	type = double,
+	min = 0.0,
+	max = 100000.0,
+	default = 200.0,
+
+	page = DelHeat,
+	translation = DelHeat_IntakeRate,
+}
+
+option DelHeat.IntakeReach
+{
+	type = integer,
+	min = 1,
+	max = 10000,
+	default = 60,
+
+	page = DelHeat,
+	translation = DelHeat_IntakeReach,
+}
+
 option DelHeat.BoilerReach
 {
 	type = integer,
@@ -84,6 +148,17 @@ option DelHeat.PumpNeedsPower
 
 	page = DelHeat,
 	translation = DelHeat_PumpNeedsPower,
+}
+
+option DelHeat.InletRadius
+{
+	type = integer,
+	min = 1,
+	max = 100,
+	default = 10,
+
+	page = DelHeat,
+	translation = DelHeat_InletRadius,
 }
 
 option DelHeat.RadiatorTemp

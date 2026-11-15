@@ -1,17 +1,22 @@
 -- Delirium Heating - the server side: keeps the network, puts down and
--- removes its objects, burns the fuel, heats the water and tells the clients
--- which radiators are hot.
+-- removes its objects, pumps the water, burns the fuel, heats the water and
+-- tells the clients which radiators are hot.
 --
 -- State: ModData "DelHeat_State". It is never transmitted whole (a town's
 -- pipes are thousands of cells): the clients get the radiator heat levels
--- ("heat") and the boilers and pumps ("status") by command. It rolls back
--- with the world save, together with the objects and the fuel items, so
--- there is no file of our own.
---   nodes   = { ["x,y,z"] = "p" | "r" | "u" | "b" }
---   cells   = { [boiler cell] = boiler anchor }
---   boilers = { [anchor] = { facing, fuel, temp, on, by } }
+-- ("heat") and the devices ("status") by command. It rolls back with the
+-- world save, together with the objects and the items, so there is no file
+-- of our own.
+--   nodes   = { ["x,y,z"] = "p" | "u" | "i" | "r" | "b" | "w" }
+--   cells   = { [boiler or intake cell] = its anchor }
+--   boilers = { [anchor] = { facing, fuel, water, temp, on, by } }
+--   intakes = { [anchor] = { powered, by } }
 --   rads    = { [cell] = facing }
 --   pumps   = { [cell] = true | false }   has power, as last seen
+--
+-- An admin builds for free and anywhere; a player (sandbox PlayersBuild)
+-- needs a pipe wrench and the item, stands next to the place and gets the
+-- item back when taking a thing apart.
 --
 -- media/lua/server/ is also executed by connected clients, hence the guard
 -- (see E:\mods\CLAUDE.md).
@@ -20,14 +25,18 @@ if isClient() then return end
 require "DH_Shared"
 
 local MODULE = DelHeat.MODULE
-local PIPE, RADIATOR, PUMP, BOILER = DelHeat.PIPE, DelHeat.RADIATOR, DelHeat.PUMP, DelHeat.BOILER
+local PIPE, PUMP, INLET = DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET
+local RADIATOR, BOILER, INTAKE = DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE
 
 local Commands = {}
 
--- Worked out from the state, not saved: which boilers feed a radiator, how
--- many radiators a boiler feeds, how much further the water would go from a
--- cell. Rebuilt whenever the network or a pump's power changes.
-local net = { feeds = {}, load = {}, reach = {} }
+-- Worked out from the state, not saved; rebuilt whenever the network or a
+-- pump's power changes.
+--   feeds[radiator] = { boiler anchor, ... }   load[boiler] = radiators fed
+--   supply[boiler] = working intakes that reach it
+--   heat[cell], water[cell] = cells the hot / the intake water would still go
+--   inlets[cell] = true for the heat units hot water reaches
+local net = { feeds = {}, load = {}, supply = {}, heat = {}, water = {}, inlets = {} }
 local dirty = true
 -- Radiator levels as last sent to the clients.
 local sentLevels = {}
@@ -43,11 +52,9 @@ end
 
 local function state()
 	local s = ModData.getOrCreate(DelHeat.STATE_KEY)
-	if type(s.nodes) ~= "table" then s.nodes = {} end
-	if type(s.cells) ~= "table" then s.cells = {} end
-	if type(s.boilers) ~= "table" then s.boilers = {} end
-	if type(s.rads) ~= "table" then s.rads = {} end
-	if type(s.pumps) ~= "table" then s.pumps = {} end
+	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "pumps" }) do
+		if type(s[name]) ~= "table" then s[name] = {} end
+	end
 	return s
 end
 
@@ -88,6 +95,78 @@ local function hasPower(square)
 	return square:haveElectricity() or square:hasGridPower()
 end
 
+local function isWater(square)
+	local floor = square and square:getFloor()
+	local sprite = floor and floor:getSprite()
+	local props = sprite and sprite:getProperties()
+	return props ~= nil and props:has(IsoFlagType.water)
+end
+
+-- Cells of a structure anchored at x, y, z.
+local function structCells(x, y, z, size)
+	local out = {}
+	for dy = 0, size.h - 1 do
+		for dx = 0, size.w - 1 do
+			table.insert(out, { x = x + dx, y = y + dy, z = z, dx = dx, dy = dy })
+		end
+	end
+	return out
+end
+
+-- ---------------------------------------------------------------------------
+-- The builder: rights, tool, items
+-- ---------------------------------------------------------------------------
+
+-- "admin", "player", or nil after telling the player why not.
+local function builderOf(player)
+	if DelHeat.isAdmin(player) then return "admin" end
+	if not DelHeat.playersBuild() then
+		notify(player, "IGUI_DelHeat_NoRights")
+		return nil
+	end
+	if not DelHeat.hasTool(player) then
+		notify(player, "IGUI_DelHeat_NeedTool")
+		return nil
+	end
+	return "player"
+end
+
+local function near(player, x, y, z, size)
+	if math.abs(math.floor(player:getZ()) - z) > 1 then return false end
+	return DelHeat.distanceTo(x, y, size or { w = 1, h = 1 }, player:getX(), player:getY()) <= DelHeat.BUILD_REACH
+end
+
+-- Somebody else's safehouse.
+local function foreign(player, square)
+	return square ~= nil and SafeHouse.isSafeHouse(square, player:getUsername(), true) ~= nil
+end
+
+local function takeItems(player, fullType, count)
+	local items = DelHeat.itemsOf(player, fullType)
+	local taken = 0
+	for i = 0, items:size() - 1 do
+		if taken >= count then break end
+		local item = items:get(i)
+		local container = item:getContainer() or player:getInventory()
+		player:removeFromHands(item)
+		container:DoRemoveItem(item)
+		sendRemoveItemFromContainer(container, item)
+		taken = taken + 1
+	end
+	return taken
+end
+
+local function giveItems(player, fullType, count)
+	local inventory = player:getInventory()
+	for _ = 1, count do
+		local item = instanceItem(fullType)
+		if item then
+			inventory:AddItem(item)
+			sendAddItemToContainer(inventory, item)
+		end
+	end
+end
+
 -- ---------------------------------------------------------------------------
 -- The network
 -- ---------------------------------------------------------------------------
@@ -96,62 +175,106 @@ local function pumpWorks(s, key, needsPower)
 	return not needsPower or s.pumps[key] == true
 end
 
--- From every boiler the water travels boilerReach cells; a working pump on
--- the way sends it on for pumpReach more. best[cell] is the most cells still
--- ahead of the water there.
-local function rebuild(s)
-	local needsPower = DelHeat.pumpNeedsPower()
-	local boilerReach, pumpReach = DelHeat.boilerReach(), DelHeat.pumpReach()
-	local feeds, load, reach = {}, {}, {}
+local function intakeWorks(intake, needsPower)
+	return not needsPower or intake.powered == true
+end
+
+-- Water leaves the start cells with `reach` cells ahead of it and runs
+-- through pipes, pumps and heat units; a working pump on the way sends it
+-- on for pumpReach more. Returns best[cell] = the most cells still ahead of
+-- the water there, and the structures (by anchor) the water arrives at.
+local function flood(s, starts, reach, pumpReach, needsPower)
 	local nodes = s.nodes
-	for bkey, boiler in pairs(s.boilers) do
-		local best, queue, head = {}, {}, 1
-		local bx, by, bz = DelHeat.unkey(bkey)
-		local size = DelHeat.BOILER_SIZE[boiler.facing] or DelHeat.BOILER_SIZE.S
-		for dy = 0, size.h - 1 do
-			for dx = 0, size.w - 1 do
-				local key = DelHeat.key(bx + dx, by + dy, bz)
-				best[key] = boilerReach
-				queue[#queue + 1] = key
+	local best, touched, queue, head = {}, {}, {}, 1
+	for _, cell in ipairs(starts) do
+		local key = DelHeat.key(cell.x, cell.y, cell.z)
+		best[key] = reach
+		queue[#queue + 1] = key
+	end
+	while head <= #queue do
+		local key = queue[head]
+		head = head + 1
+		local left = best[key]
+		if left > 0 then
+			local x, y, z = DelHeat.unkey(key)
+			local around = {
+				DelHeat.key(x, y - 1, z), DelHeat.key(x + 1, y, z), DelHeat.key(x, y + 1, z),
+				DelHeat.key(x - 1, y, z), DelHeat.key(x, y, z + 1), DelHeat.key(x, y, z - 1),
+			}
+			for _, nkey in ipairs(around) do
+				local kind = nodes[nkey]
+				if kind == PIPE or kind == PUMP or kind == INLET then
+					local ahead = left - 1
+					if kind == PUMP and ahead < pumpReach and pumpWorks(s, nkey, needsPower) then
+						ahead = pumpReach
+					end
+					if (best[nkey] or -1) < ahead then
+						best[nkey] = ahead
+						queue[#queue + 1] = nkey
+					end
+				elseif kind == BOILER or kind == INTAKE then
+					local anchor = s.cells[nkey]
+					if anchor then touched[anchor] = true end
+				end
 			end
 		end
-		while head <= #queue do
-			local key = queue[head]
-			head = head + 1
-			local left = best[key]
-			if left > 0 then
-				local x, y, z = DelHeat.unkey(key)
-				local around = {
-					DelHeat.key(x, y - 1, z), DelHeat.key(x + 1, y, z), DelHeat.key(x, y + 1, z),
-					DelHeat.key(x - 1, y, z), DelHeat.key(x, y, z + 1), DelHeat.key(x, y, z - 1),
-				}
-				for _, nkey in ipairs(around) do
-					local kind = nodes[nkey]
-					if kind and kind ~= BOILER then
-						local ahead = left - 1
-						if kind == PUMP and ahead < pumpReach and pumpWorks(s, nkey, needsPower) then
-							ahead = pumpReach
-						end
-						if (best[nkey] or -1) < ahead then
-							best[nkey] = ahead
-							queue[#queue + 1] = nkey
-						end
+	end
+	return best, touched
+end
+
+local function rebuild(s)
+	local needsPower = DelHeat.pumpNeedsPower()
+	local pumpReach = DelHeat.pumpReach()
+	local radius, floors = DelHeat.inletRadius(), DelHeat.INLET_FLOORS
+	local feeds, load, supply, heat, water, inlets = {}, {}, {}, {}, {}, {}
+
+	local rads = {}
+	for key, _ in pairs(s.rads) do
+		local x, y, z = DelHeat.unkey(key)
+		if x then table.insert(rads, { key = key, x = x, y = y, z = z }) end
+	end
+
+	-- Hot water: boiler -> pipes -> heat units -> the radiators around them.
+	for bkey, boiler in pairs(s.boilers) do
+		local bx, by, bz = DelHeat.unkey(bkey)
+		local best = flood(s, structCells(bx, by, bz, DelHeat.sizeOf(BOILER, boiler.facing)),
+			DelHeat.boilerReach(), pumpReach, needsPower)
+		local fed, count = {}, 0
+		for key, ahead in pairs(best) do
+			if (heat[key] or -1) < ahead then heat[key] = ahead end
+			if s.nodes[key] == INLET then
+				inlets[key] = true
+				local ix, iy, iz = DelHeat.unkey(key)
+				for _, rad in ipairs(rads) do
+					if not fed[rad.key] and math.abs(rad.x - ix) <= radius and math.abs(rad.y - iy) <= radius
+						and math.abs(rad.z - iz) <= floors then
+						fed[rad.key] = true
+						count = count + 1
+						if not feeds[rad.key] then feeds[rad.key] = {} end
+						table.insert(feeds[rad.key], bkey)
 					end
 				end
 			end
 		end
-		local count = 0
-		for key, ahead in pairs(best) do
-			if (reach[key] or -1) < ahead then reach[key] = ahead end
-			if nodes[key] == RADIATOR then
-				count = count + 1
-				if not feeds[key] then feeds[key] = {} end
-				table.insert(feeds[key], bkey)
-			end
-		end
 		load[bkey] = count
 	end
-	net = { feeds = feeds, load = load, reach = reach }
+
+	-- Cold water: working intake -> pipes -> the boilers it arrives at.
+	for ikey, intake in pairs(s.intakes) do
+		if intakeWorks(intake, needsPower) then
+			local ix, iy, iz = DelHeat.unkey(ikey)
+			local best, touched = flood(s, structCells(ix, iy, iz, DelHeat.sizeOf(INTAKE)),
+				DelHeat.intakeReach(), pumpReach, needsPower)
+			for key, ahead in pairs(best) do
+				if (water[key] or -1) < ahead then water[key] = ahead end
+			end
+			for anchor, _ in pairs(touched) do
+				if s.boilers[anchor] then supply[anchor] = (supply[anchor] or 0) + 1 end
+			end
+		end
+	end
+
+	net = { feeds = feeds, load = load, supply = supply, heat = heat, water = water, inlets = inlets }
 	dirty = false
 end
 
@@ -160,7 +283,7 @@ local function network(s)
 	return net
 end
 
--- Heat level of every radiator the water reaches (0 while the water is cold).
+-- Heat level of every radiator a heat unit serves (0 while the water is cold).
 local function levels(s)
 	local n = network(s)
 	local out = {}
@@ -188,20 +311,25 @@ end
 local function statusOf(s)
 	local n = network(s)
 	local needsPower = DelHeat.pumpNeedsPower()
-	local boilers, pumps = {}, {}
+	local boilers, pumps, intakes = {}, {}, {}
 	for key, boiler in pairs(s.boilers) do
 		boilers[key] = {
 			facing = boiler.facing,
 			fuel = round1(boiler.fuel),
-			temp = math.floor((boiler.temp or 0) + 0.5),
+			water = math.floor((tonumber(boiler.water) or 0) + 0.5),
+			temp = math.floor((tonumber(boiler.temp) or 0) + 0.5),
 			on = boiler.on == true,
 			load = n.load[key] or 0,
+			supply = n.supply[key] or 0,
 		}
 	end
 	for key, _ in pairs(s.pumps) do
 		pumps[key] = pumpWorks(s, key, needsPower)
 	end
-	return { boilers = boilers, pumps = pumps }
+	for key, intake in pairs(s.intakes) do
+		intakes[key] = intakeWorks(intake, needsPower)
+	end
+	return { boilers = boilers, pumps = pumps, intakes = intakes, inlets = n.inlets }
 end
 
 -- To everyone; the heat only when it changed (or forced).
@@ -232,21 +360,25 @@ local function wantedSprites(s, x, y, z)
 	local key = DelHeat.key(x, y, z)
 	local kind = s.nodes[key]
 	if not kind then return {} end
-	if kind == BOILER then
+	if kind == BOILER or kind == INTAKE then
 		local anchor = s.cells[key]
-		local boiler = anchor and s.boilers[anchor]
-		if not boiler then return {} end
+		if not anchor then return {} end
 		local ax, ay = DelHeat.unkey(anchor)
+		if kind == INTAKE then return { DelHeat.intakeSprite(x - ax, y - ay) } end
+		local boiler = s.boilers[anchor]
+		if not boiler then return {} end
 		return { DelHeat.boilerSprite(boiler.facing, x - ax, y - ay) }
 	end
+	if kind == RADIATOR then return { DelHeat.radiatorSprite(s.rads[key]) } end
 	local mask = 0
 	for _, dir in ipairs(DelHeat.DIRS) do
-		if s.nodes[DelHeat.key(x + dir.dx, y + dir.dy, z)] then mask = mask + dir.bit end
+		local other = s.nodes[DelHeat.key(x + dir.dx, y + dir.dy, z)]
+		if other and other ~= RADIATOR then mask = mask + dir.bit end
 	end
 	local list = {}
 	if kind == PIPE or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask)) end
-	if kind == RADIATOR then table.insert(list, DelHeat.radiatorSprite(s.rads[key])) end
 	if kind == PUMP then table.insert(list, DelHeat.pumpSprite()) end
+	if kind == INLET then table.insert(list, DelHeat.inletSprite()) end
 	return list
 end
 
@@ -312,11 +444,11 @@ local function blockedThin(s, square, x, y, z)
 	return nil
 end
 
--- The same for a pump or a boiler cell: they stand in the way.
+-- The same for a device that stands in the way.
 local function blockedSolid(s, square, x, y, z)
 	local why = blockedThin(s, square, x, y, z)
 	if why then return why end
-	if square:isSolid() or square:isSolidTrans() or square:getVehicleContainer() then
+	if square:isSolid() or square:isSolidTrans() or square:getVehicleContainer() or isWater(square) then
 		return "IGUI_DelHeat_Occupied"
 	end
 	return nil
@@ -338,101 +470,134 @@ local function path(x1, y1, x2, y2, z)
 	return out
 end
 
-local function boilerCells(x, y, z, facing)
-	local size = DelHeat.BOILER_SIZE[facing]
-	local out = {}
-	for dy = 0, size.h - 1 do
-		for dx = 0, size.w - 1 do
-			table.insert(out, { x = x + dx, y = y + dy, z = z, dx = dx, dy = dy })
+local function waterNear(x, y, z, size)
+	local range = DelHeat.WATER_RANGE
+	for wy = y - range, y + size.h - 1 + range do
+		for wx = x - range, x + size.w - 1 + range do
+			if isWater(getCell():getGridSquare(wx, wy, z)) then return true end
 		end
 	end
-	return out
+	return false
 end
 
 -- ---------------------------------------------------------------------------
--- Commands: admin
+-- Commands: building
 -- ---------------------------------------------------------------------------
 
--- { x, y, z, kind = "pipe" | "radiator" | "pump" | "boiler", facing }
+-- { x, y, z, kind = "pipe" | "radiator" | "inlet" | "pump" | "boiler" | "intake", facing }
+-- For a boiler and an intake the clicked cell is the one next to the
+-- anchor's south-east: the middle of a boiler's front, the near corner of
+-- an intake.
 function Commands.place(player, args)
-	if not DelHeat.isAdmin(player) then return end
+	local who = builderOf(player)
+	if not who then return end
 	local x, y, z = coords(args)
-	if not x then return end
+	local name = args.kind
+	local itemType = DelHeat.ITEM[name]
+	if not x or not itemType then return end
 	local s = state()
-	local kind = args.kind
-	if kind == "boiler" then
-		local facing = oneOf(DelHeat.BOILER_FACINGS, args.facing)
+
+	local structure = name == "boiler" or name == "intake"
+	local facing, size, cells
+	if name == "boiler" then
+		facing = oneOf(DelHeat.BOILER_FACINGS, args.facing)
 		if not facing then return end
-		-- The clicked cell is the middle of the front.
-		local ax, ay = x - 1, y - 1
-		local cells = boilerCells(ax, ay, z, facing)
-		for _, cell in ipairs(cells) do
-			local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
-			local why = blockedSolid(s, square, cell.x, cell.y, cell.z)
-			-- Walls inside the footprint; those along its north and west edge are fine.
-			if not why and ((cell.dx > 0 and square:has(IsoFlagType.collideW))
-				or (cell.dy > 0 and square:has(IsoFlagType.collideN))) then
-				why = "IGUI_DelHeat_Occupied"
-			end
-			if why then return notify(player, why) end
-		end
-		local anchor = DelHeat.key(ax, ay, z)
-		s.boilers[anchor] = { facing = facing, fuel = 0, temp = ambient(), on = false, by = player:getUsername() }
-		for _, cell in ipairs(cells) do
-			local key = DelHeat.key(cell.x, cell.y, cell.z)
-			s.nodes[key] = BOILER
-			s.cells[key] = anchor
-		end
-		redrawAround(s, cells)
-		changed(s)
-		notify(player, "IGUI_DelHeat_Placed")
-		log(string.format("Boiler placed: %s %s at %s", player:getUsername(), facing, anchor))
-		return
+	elseif name == "radiator" then
+		facing = oneOf(DelHeat.RADIATOR_FACINGS, args.facing) or "N"
+	end
+	if structure then
+		x, y = x - 1, y - 1
+		size = DelHeat.sizeOf(name == "intake" and INTAKE or BOILER, facing)
+		cells = structCells(x, y, z, size)
+	else
+		cells = { { x = x, y = y, z = z, dx = 0, dy = 0 } }
 	end
 
-	local square = getCell():getGridSquare(x, y, z)
+	for _, cell in ipairs(cells) do
+		local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
+		local why
+		if name == "pipe" or name == "radiator" then
+			why = blockedThin(s, square, cell.x, cell.y, cell.z)
+		else
+			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
+		end
+		-- Walls inside the footprint; those along its north and west edge are fine.
+		if not why and ((cell.dx > 0 and square:has(IsoFlagType.collideW))
+			or (cell.dy > 0 and square:has(IsoFlagType.collideN))) then
+			why = "IGUI_DelHeat_Occupied"
+		end
+		if not why and who == "player" and foreign(player, square) then why = "IGUI_DelHeat_Safehouse" end
+		if why then return notify(player, why) end
+	end
+	if who == "player" then
+		if not near(player, x, y, z, size) then return notify(player, "IGUI_DelHeat_ComeCloser") end
+		if name == "intake" and not waterNear(x, y, z, size) then return notify(player, "IGUI_DelHeat_NeedWater") end
+		if takeItems(player, itemType, 1) < 1 then return notify(player, "IGUI_DelHeat_NeedItem") end
+	end
+
 	local key = DelHeat.key(x, y, z)
-	local why
-	if kind == "pump" then
-		why = blockedSolid(s, square, x, y, z)
-	elseif kind == "pipe" or kind == "radiator" then
-		why = blockedThin(s, square, x, y, z)
-	else
-		return
+	if name == "boiler" then
+		s.boilers[key] = { facing = facing, fuel = 0, water = 0, temp = ambient(), on = false, by = player:getUsername() }
+	elseif name == "intake" then
+		s.intakes[key] = { powered = hasPower(getCell():getGridSquare(x, y, z)), by = player:getUsername() }
 	end
-	if why then return notify(player, why) end
-	if kind == "pump" then
-		s.nodes[key] = PUMP
-		s.pumps[key] = hasPower(square)
-	elseif kind == "radiator" then
-		s.nodes[key] = RADIATOR
-		s.rads[key] = oneOf(DelHeat.RADIATOR_FACINGS, args.facing) or "N"
-	else
-		s.nodes[key] = PIPE
+	for _, cell in ipairs(cells) do
+		local ckey = DelHeat.key(cell.x, cell.y, cell.z)
+		if name == "boiler" then
+			s.nodes[ckey], s.cells[ckey] = BOILER, key
+		elseif name == "intake" then
+			s.nodes[ckey], s.cells[ckey] = INTAKE, key
+		elseif name == "pump" then
+			s.nodes[ckey] = PUMP
+			s.pumps[ckey] = hasPower(getCell():getGridSquare(x, y, z))
+		elseif name == "inlet" then
+			s.nodes[ckey] = INLET
+		elseif name == "radiator" then
+			s.nodes[ckey] = RADIATOR
+			s.rads[ckey] = facing
+		else
+			s.nodes[ckey] = PIPE
+		end
 	end
-	redrawAround(s, { { x = x, y = y, z = z } })
+	redrawAround(s, cells)
 	changed(s)
 	notify(player, "IGUI_DelHeat_Placed")
-	log(string.format("Placed: %s %s at %s", player:getUsername(), kind, key))
+	log(string.format("Placed: %s (%s) %s at %s", player:getUsername(), who, name, key))
+end
+
+-- The run of a line command: who, state, cells; nil after telling why not.
+local function lineOf(player, args)
+	local who = builderOf(player)
+	if not who then return nil end
+	local x1, y1, z = coords(args, "x1", "y1")
+	local x2, y2 = coords(args, "x2", "y2")
+	if not x1 or not x2 then return nil end
+	if math.abs(x2 - x1) + math.abs(y2 - y1) + 1 > DelHeat.MAX_LINE then
+		notify(player, "IGUI_DelHeat_LineTooLong", tostring(DelHeat.MAX_LINE))
+		return nil
+	end
+	if who == "player" and not near(player, x2, y2, z) then
+		notify(player, "IGUI_DelHeat_ComeCloser")
+		return nil
+	end
+	return who, state(), path(x1, y1, x2, y2, z)
 end
 
 -- { x1, y1, x2, y2, z }: pipes along x, then along y. Cells that already
 -- hold something are passed over; the run stops at the first cell that
--- takes no pipe.
+-- takes no pipe, or when the player's pipes run out.
 function Commands.line(player, args)
-	if not DelHeat.isAdmin(player) then return end
-	local x1, y1, z = coords(args, "x1", "y1")
-	local x2, y2 = coords(args, "x2", "y2")
-	if not x1 or not x2 then return end
-	if math.abs(x2 - x1) + math.abs(y2 - y1) + 1 > DelHeat.MAX_LINE then
-		return notify(player, "IGUI_DelHeat_LineTooLong", tostring(DelHeat.MAX_LINE))
-	end
-	local s = state()
+	local who, s, cells = lineOf(player, args)
+	if not who then return end
+	local have = who == "player" and DelHeat.countOf(player, DelHeat.ITEM.pipe) or nil
 	local laid, stopped = {}, nil
-	for _, cell in ipairs(path(x1, y1, x2, y2, z)) do
+	for _, cell in ipairs(cells) do
 		local key = DelHeat.key(cell.x, cell.y, cell.z)
 		if not s.nodes[key] then
-			local why = blockedThin(s, getCell():getGridSquare(cell.x, cell.y, cell.z), cell.x, cell.y, cell.z)
+			local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
+			local why = blockedThin(s, square, cell.x, cell.y, cell.z)
+			if not why and who == "player" and foreign(player, square) then why = "IGUI_DelHeat_Safehouse" end
+			if not why and have and #laid >= have then why = "IGUI_DelHeat_NeedItem" end
 			if why then
 				stopped = why
 				break
@@ -442,9 +607,11 @@ function Commands.line(player, args)
 		end
 	end
 	if #laid > 0 then
+		if who == "player" then takeItems(player, DelHeat.ITEM.pipe, #laid) end
 		redrawAround(s, laid)
 		changed(s)
-		log(string.format("Pipes laid: %s %d from %d,%d to %d,%d,%d", player:getUsername(), #laid, x1, y1, x2, y2, z))
+		log(string.format("Pipes laid: %s (%s) %d to %d,%d,%d", player:getUsername(), who, #laid,
+			cells[#cells].x, cells[#cells].y, cells[#cells].z))
 	end
 	if stopped then
 		notify(player, "IGUI_DelHeat_LineStopped", tostring(#laid), stopped)
@@ -455,53 +622,72 @@ end
 
 -- { x1, y1, x2, y2, z }: takes the pipes off the same run; devices stay.
 function Commands.unline(player, args)
-	if not DelHeat.isAdmin(player) then return end
-	local x1, y1, z = coords(args, "x1", "y1")
-	local x2, y2 = coords(args, "x2", "y2")
-	if not x1 or not x2 then return end
-	if math.abs(x2 - x1) + math.abs(y2 - y1) + 1 > DelHeat.MAX_LINE then
-		return notify(player, "IGUI_DelHeat_LineTooLong", tostring(DelHeat.MAX_LINE))
-	end
-	local s = state()
+	local who, s, cells = lineOf(player, args)
+	if not who then return end
 	local taken = {}
-	for _, cell in ipairs(path(x1, y1, x2, y2, z)) do
+	for _, cell in ipairs(cells) do
 		local key = DelHeat.key(cell.x, cell.y, cell.z)
 		if s.nodes[key] == PIPE then
 			-- An unloaded square would keep its sprite: stop there.
-			if not getCell():getGridSquare(cell.x, cell.y, cell.z) then break end
+			local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
+			if not square or (who == "player" and foreign(player, square)) then break end
 			s.nodes[key] = nil
 			table.insert(taken, cell)
 		end
 	end
 	if #taken > 0 then
+		if who == "player" then giveItems(player, DelHeat.ITEM.pipe, #taken) end
 		redrawAround(s, taken)
 		changed(s)
-		log(string.format("Pipes removed: %s %d from %d,%d to %d,%d,%d", player:getUsername(), #taken, x1, y1, x2, y2, z))
+		log(string.format("Pipes removed: %s (%s) %d to %d,%d,%d", player:getUsername(), who, #taken,
+			cells[#cells].x, cells[#cells].y, cells[#cells].z))
 	end
 	notify(player, "IGUI_DelHeat_LineRemoved", tostring(#taken))
 end
 
--- { x, y, z (any cell) }: removes what stands there, a boiler whole.
+-- { x, y, z (any cell) }: removes what stands there, a structure whole. A
+-- player gets the item back.
 function Commands.remove(player, args)
-	if not DelHeat.isAdmin(player) then return end
+	local who = builderOf(player)
+	if not who then return end
 	local x, y, z = coords(args)
 	if not x then return end
 	local s = state()
 	local key = DelHeat.key(x, y, z)
 	local square = getCell():getGridSquare(x, y, z)
+	local kind = s.nodes[key]
 	local cells = { { x = x, y = y, z = z } }
-	local anchor, facing = s.cells[key], nil
+	local anchor, size = s.cells[key], nil
 	if anchor and s.boilers[anchor] then
-		facing = s.boilers[anchor].facing
+		size = DelHeat.sizeOf(BOILER, s.boilers[anchor].facing)
+	elseif anchor and s.intakes[anchor] then
+		size = DelHeat.sizeOf(INTAKE)
 	else
-		-- Sprites without a record (the state rolled back without them).
+		-- Sprites without a record (the state rolled back without them): the
+		-- admin clears them, nothing is given back.
 		local node = DelHeat.nodeAt(square)
-		if node and node.kind == BOILER then anchor, facing = node.key, node.facing end
+		if not kind and (not node or who ~= "admin") then return end
+		anchor = nil
+		if not kind and (node.kind == BOILER or node.kind == INTAKE) then
+			anchor, size = node.key, DelHeat.sizeOf(node.kind, node.facing)
+		end
 	end
-	if anchor and facing then
-		local ax, ay, az = DelHeat.unkey(anchor)
-		cells = boilerCells(ax, ay, az, facing)
+	local ax, ay, az = x, y, z
+	if anchor then
+		ax, ay, az = DelHeat.unkey(anchor)
+		cells = structCells(ax, ay, az, size)
+	end
+	if who == "player" then
+		if not near(player, ax, ay, az, size) then return notify(player, "IGUI_DelHeat_ComeCloser") end
+		for _, cell in ipairs(cells) do
+			if foreign(player, getCell():getGridSquare(cell.x, cell.y, cell.z)) then
+				return notify(player, "IGUI_DelHeat_Safehouse")
+			end
+		end
+	end
+	if anchor then
 		s.boilers[anchor] = nil
+		s.intakes[anchor] = nil
 	end
 	for _, cell in ipairs(cells) do
 		local ckey = DelHeat.key(cell.x, cell.y, cell.z)
@@ -510,45 +696,50 @@ function Commands.remove(player, args)
 		s.rads[ckey] = nil
 		s.pumps[ckey] = nil
 	end
+	local itemType = kind and DelHeat.ITEM[DelHeat.NAME[kind] or ""]
+	if who == "player" and itemType then giveItems(player, itemType, 1) end
 	redrawAround(s, cells)
 	changed(s)
 	notify(player, "IGUI_DelHeat_Removed")
-	log(string.format("Removed: %s at %s", player:getUsername(), key))
+	log(string.format("Removed: %s (%s) %s at %s", player:getUsername(), who, tostring(kind), key))
 end
 
--- { x, y, z (any boiler cell) }: fuel to the brim.
-function Commands.refuel(player, args)
+-- ---------------------------------------------------------------------------
+-- Commands: admin
+-- ---------------------------------------------------------------------------
+
+-- { x, y, z (any boiler cell), what = "fuel" | "water" }: to the brim.
+function Commands.fill(player, args)
 	if not DelHeat.isAdmin(player) then return end
 	local x, y, z = coords(args)
 	if not x then return end
 	local s = state()
 	local boiler = s.boilers[s.cells[DelHeat.key(x, y, z)] or ""]
 	if not boiler then return end
-	boiler.fuel = DelHeat.fuelCapacity()
-	pushStatus(s)
-	notify(player, "IGUI_DelHeat_Refuelled", tostring(round1(boiler.fuel)))
-	log(string.format("Refuelled: %s at %s", player:getUsername(), DelHeat.key(x, y, z)))
-end
-
--- { x, y, z }: does the water get here.
-function Commands.probe(player, args)
-	if not DelHeat.isAdmin(player) then return end
-	local x, y, z = coords(args)
-	if not x then return end
-	local s = state()
-	local key = DelHeat.key(x, y, z)
-	if not s.nodes[key] then return notify(player, "IGUI_DelHeat_ProbeNothing") end
-	local ahead = network(s).reach[key]
-	if ahead then
-		notify(player, "IGUI_DelHeat_ProbeYes", tostring(ahead))
+	if args.what == "water" then
+		boiler.water = DelHeat.waterCapacity()
+		notify(player, "IGUI_DelHeat_WaterFilled", tostring(boiler.water))
 	else
-		notify(player, "IGUI_DelHeat_ProbeNo")
+		boiler.fuel = DelHeat.fuelCapacity()
+		notify(player, "IGUI_DelHeat_Refuelled", tostring(round1(boiler.fuel)))
 	end
+	pushStatus(s)
+	log(string.format("Filled (%s): %s at %s", tostring(args.what), player:getUsername(), DelHeat.key(x, y, z)))
 end
 
 -- ---------------------------------------------------------------------------
 -- Commands: anyone
 -- ---------------------------------------------------------------------------
+
+-- { x, y, z }: does the water get here - the intake's and the boiler's.
+function Commands.probe(player, args)
+	local x, y, z = coords(args)
+	if not x then return end
+	local s = state()
+	local key = DelHeat.key(x, y, z)
+	local n = network(s)
+	reply(player, "probe", { any = s.nodes[key] ~= nil, heat = n.heat[key], water = n.water[key] })
+end
 
 -- The boiler under the cell, when the player stands near enough.
 local function boilerNear(s, player, args)
@@ -558,8 +749,8 @@ local function boilerNear(s, player, args)
 	local boiler = anchor and s.boilers[anchor]
 	if not boiler then return nil end
 	local ax, ay, az = DelHeat.unkey(anchor)
-	if math.floor(player:getZ()) ~= az
-		or DelHeat.boilerDistance(ax, ay, boiler.facing, player:getX(), player:getY()) > DelHeat.REACH then
+	if math.floor(player:getZ()) ~= az or DelHeat.distanceTo(ax, ay, DelHeat.sizeOf(BOILER, boiler.facing),
+		player:getX(), player:getY()) > DelHeat.REACH then
 		notify(player, "IGUI_DelHeat_TooFar")
 		return nil
 	end
@@ -644,27 +835,33 @@ local function everyMinute()
 	local s = state()
 	local n = network(s)
 	local base, perRadiator = DelHeat.burnPerHour(), DelHeat.burnPerRadiator()
+	local waterBase, waterPerRadiator = DelHeat.waterPerHour(), DelHeat.waterPerRadiator()
+	local waterCapacity, intakeRate = DelHeat.waterCapacity(), DelHeat.intakeRate()
 	local heatUp, coolDown = DelHeat.heatUpPerMinute(), DelHeat.coolDownPerMinute()
 	local air = ambient()
 	local any = false
 	for key, boiler in pairs(s.boilers) do
 		any = true
-		local fuel, temp = tonumber(boiler.fuel) or 0, tonumber(boiler.temp) or air
-		if boiler.on and fuel > 0 then
-			fuel = math.max(0, fuel - (base + perRadiator * (n.load[key] or 0)) / 60)
+		local fuel, water = tonumber(boiler.fuel) or 0, tonumber(boiler.water) or 0
+		local temp = tonumber(boiler.temp) or air
+		local load = n.load[key] or 0
+		water = math.min(waterCapacity, water + (n.supply[key] or 0) * intakeRate / 60)
+		if boiler.on and fuel > 0 and water > 0 then
+			fuel = math.max(0, fuel - (base + perRadiator * load) / 60)
+			water = math.max(0, water - (waterBase + waterPerRadiator * load) / 60)
 			temp = math.min(DelHeat.WATER_MAX, temp + heatUp)
 		elseif temp > air then
 			temp = math.max(air, temp - coolDown)
 		else
 			temp = air
 		end
-		boiler.fuel, boiler.temp = fuel, temp
+		boiler.fuel, boiler.water, boiler.temp = fuel, water, temp
 	end
 	if any then pushHeat(s, false) end
 end
 
--- Pump power is read only where the square is loaded; elsewhere a pump
--- keeps the state it was last seen in.
+-- Power is read only where the square is loaded; elsewhere a pump or an
+-- intake keeps the state it was last seen in.
 local function everyTenMinutes()
 	local s = state()
 	local any = false
@@ -676,6 +873,18 @@ local function everyTenMinutes()
 			local now = hasPower(square)
 			if now ~= was then
 				s.pumps[key] = now
+				dirty = true
+			end
+		end
+	end
+	for key, intake in pairs(s.intakes) do
+		any = true
+		local x, y, z = DelHeat.unkey(key)
+		local square = x and getCell():getGridSquare(x, y, z)
+		if square then
+			local now = hasPower(square)
+			if now ~= intake.powered then
+				intake.powered = now
 				dirty = true
 			end
 		end

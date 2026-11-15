@@ -1,0 +1,8 @@
+{
+	"DelHeat.Pipe": "Heating Pipe",
+	"DelHeat.Radiator": "Radiator",
+	"DelHeat.Inlet": "Heat Unit",
+	"DelHeat.Pump": "Pump Station",
+	"DelHeat.Intake": "Water Intake Kit",
+	"DelHeat.Boiler": "Boiler House Kit"
+}

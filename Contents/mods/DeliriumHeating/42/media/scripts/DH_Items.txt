@@ -1,0 +1,71 @@
+module DelHeat
+{
+	imports
+	{
+		Base
+	}
+
+	/* Building pieces of the heating. They are put down from the context
+	   menu on the ground (Heating), with a pipe wrench on the player, and
+	   come back when the thing is taken apart. */
+
+	item Pipe
+	{
+		DisplayName = Heating Pipe,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 2.0,
+		Icon = DelHeatPipe,
+		Tooltip = Tooltip_DelHeat_Pipe,
+	}
+
+	item Radiator
+	{
+		DisplayName = Radiator,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 8.0,
+		Icon = DelHeatRadiator,
+		Tooltip = Tooltip_DelHeat_Radiator,
+	}
+
+	item Inlet
+	{
+		DisplayName = Heat Unit,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 10.0,
+		Icon = DelHeatInlet,
+		Tooltip = Tooltip_DelHeat_Inlet,
+	}
+
+	item Pump
+	{
+		DisplayName = Pump Station,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 20.0,
+		Icon = DelHeatPump,
+		Tooltip = Tooltip_DelHeat_Pump,
+	}
+
+	item Intake
+	{
+		DisplayName = Water Intake Kit,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 30.0,
+		Icon = DelHeatIntake,
+		Tooltip = Tooltip_DelHeat_Intake,
+	}
+
+	item Boiler
+	{
+		DisplayName = Boiler House Kit,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 40.0,
+		Icon = DelHeatBoiler,
+		Tooltip = Tooltip_DelHeat_Boiler,
+	}
+}

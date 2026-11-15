@@ -1,0 +1,150 @@
+module DelHeat
+{
+	imports
+	{
+		Base
+	}
+
+	/* the crafting tab label is IGUI_CraftingCategories_Heating;
+	   BlowTorch counts are uses of the torch, a full one holds 10 */
+
+	craftRecipe MakeHeatingPipe
+	{
+		timedAction = Welding,
+		time = 150,
+		SkillRequired = MetalWelding:2,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:8,
+		inputs
+		{
+			item 1 [Base.SheetMetal],
+			item 1 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 3 DelHeat.Pipe,
+		}
+	}
+
+	craftRecipe MakeHeatingRadiator
+	{
+		timedAction = Welding,
+		time = 250,
+		SkillRequired = MetalWelding:2,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:15,
+		inputs
+		{
+			item 4 [Base.SmallSheetMetal],
+			item 2 [Base.MetalPipe],
+			item 2 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Radiator,
+		}
+	}
+
+	craftRecipe MakeHeatUnit
+	{
+		timedAction = Welding,
+		time = 300,
+		SkillRequired = MetalWelding:3,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:20,
+		inputs
+		{
+			item 2 [Base.SheetMetal],
+			item 4 [Base.MetalPipe],
+			item 6 [Base.NutsBolts],
+			item 3 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Inlet,
+		}
+	}
+
+	craftRecipe MakeHeatingPump
+	{
+		timedAction = Welding,
+		time = 400,
+		SkillRequired = MetalWelding:4;Electricity:3,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:30;Electricity:20,
+		inputs
+		{
+			item 2 [Base.SheetMetal],
+			item 2 [Base.MetalPipe],
+			item 2 [Base.MetalBar],
+			item 1 [Base.EngineParts],
+			item 4 [Base.ElectricWire],
+			item 10 [Base.ElectronicsScrap],
+			item 10 [Base.Screws],
+			item 4 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Pump,
+		}
+	}
+
+	craftRecipe MakeWaterIntake
+	{
+		timedAction = Welding,
+		time = 600,
+		SkillRequired = MetalWelding:5;Electricity:4,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:50;Electricity:30,
+		inputs
+		{
+			item 6 [Base.SheetMetal],
+			item 6 [Base.MetalPipe],
+			item 4 [Base.MetalBar],
+			item 2 [Base.EngineParts],
+			item 2 [Base.RubberHose],
+			item 6 [Base.ElectricWire],
+			item 15 [Base.ElectronicsScrap],
+			item 20 [Base.Screws],
+			item 8 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Intake,
+		}
+	}
+
+	craftRecipe MakeBoilerHouse
+	{
+		timedAction = Welding,
+		time = 1000,
+		SkillRequired = MetalWelding:7,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:100,
+		inputs
+		{
+			item 20 [Base.SheetMetal],
+			item 10 [Base.MetalPipe],
+			item 10 [Base.MetalBar],
+			item 60 [Base.ClayBrick],
+			item 20 [Base.NutsBolts],
+			item 10 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Boiler,
+		}
+	}
+}

@@ -93,6 +93,14 @@
       }
     },
     {
+      "index": 17,
+      "png": "frames/delheat_01_17.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
       "index": 18,
       "png": "frames/delheat_01_18.png",
       "props": {}
@@ -203,6 +211,38 @@
     {
       "index": 33,
       "png": "frames/delheat_01_33.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 34,
+      "png": "frames/delheat_01_34.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 35,
+      "png": "frames/delheat_01_35.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 36,
+      "png": "frames/delheat_01_36.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 37,
+      "png": "frames/delheat_01_37.png",
       "props": {
         "solidtrans": "",
         "BlocksPlacement": ""

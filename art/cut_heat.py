@@ -25,7 +25,10 @@ SCALE = 4
 SHADOW = 0.45
 
 PUMP = 16
-INLET = 17
+INLET = {"N": 17, "W": 38, "S": 39, "E": 40}
+RISER = 41
+# One level up is 192 px at 2x.
+LEVEL = 192
 RADIATOR = {"N": 18, "W": 19, "S": 20, "E": 21}
 # render name: first index, cells wide, cells deep
 STRUCTURES = {"boiler_S": (22, 3, 2), "boiler_E": (28, 2, 3), "intake": (34, 2, 2)}
@@ -120,30 +123,34 @@ def assemble(name):
 
 
 def scene():
-    # A little network drawn the way the game would: cells back to front.
-    # The main ends in a heat unit; the radiators stand apart from the pipes.
+    # A little network drawn the way the game would: levels bottom up, cells
+    # back to front. The main ends in heat units at the four walls; the
+    # radiators stand apart from the pipes; one branch crosses in the air.
     cells = {}
 
-    def put(x, y, *indices):
-        cells.setdefault((x, y), []).extend(indices)
+    def put(x, y, z, *indices):
+        cells.setdefault((x, y, z), []).extend(indices)
 
-    nodes = {(x, 3) for x in range(0, 7)} | {(3, y) for y in range(0, 7)} | {(6, y) for y in range(3, 6)}
-    devices = {(6, 5): INLET, (4, 3): PUMP}
-    for (x, y) in nodes:
+    nodes = {(x, 3, 0) for x in range(0, 7)} | {(3, y, 0) for y in range(0, 7)} | {(6, y, 0) for y in range(3, 6)}
+    nodes |= {(0, 4, 0), (0, 5, 0), (0, 9, 0), (0, 10, 0)} | {(0, y, 1) for y in range(5, 10)}
+    devices = {(6, 5, 0): INLET["E"], (4, 3, 0): PUMP, (3, 0, 0): INLET["N"], (3, 6, 0): INLET["S"], (0, 10, 0): INLET["W"]}
+    for (x, y, z) in nodes:
         mask = sum(bit for bit, (dx, dy) in ((1, (0, -1)), (2, (1, 0)), (4, (0, 1)), (8, (-1, 0)))
-                   if (x + dx, y + dy) in nodes)
-        put(x, y, mask)
-        if (x, y) in devices:
-            put(x, y, devices[(x, y)])
-    put(5, 7, RADIATOR["N"])
-    put(8, 6, RADIATOR["E"])
-    put(4, 5, RADIATOR["W"])
-    put(7, 8, RADIATOR["S"])
-    w, h = 9 * 128 + 64, 9 * 64 + 256
+                   if (x + dx, y + dy, z) in nodes)
+        put(x, y, z, mask)
+        if (x, y, z + 1) in nodes:
+            put(x, y, z, RISER)
+        if (x, y, z) in devices:
+            put(x, y, z, devices[(x, y, z)])
+    put(5, 7, 0, RADIATOR["N"])
+    put(8, 6, 0, RADIATOR["E"])
+    put(4, 5, 0, RADIATOR["W"])
+    put(7, 8, 0, RADIATOR["S"])
+    w, h = 12 * 128 + 64, 11 * 64 + 256
     img = Image.new("RGBA", (w, h), (74, 96, 58, 255))
-    for (x, y) in sorted(cells, key=lambda c: (c[0] + c[1], c[0])):
-        for index in cells[(x, y)]:
-            img.alpha_composite(frame(index), (w // 2 - 64 + (x - y) * 64, 32 + (x + y) * 32))
+    for (x, y, z) in sorted(cells, key=lambda c: (c[2], c[0] + c[1], c[0])):
+        for index in cells[(x, y, z)]:
+            img.alpha_composite(frame(index), (w // 2 - 64 + (x - y) * 64, 32 + (x + y) * 32 - z * LEVEL + 100))
     return img
 
 
@@ -169,8 +176,8 @@ def tiles_json():
     for mask in range(16):
         add(mask)
     add(PUMP, SOLID)
-    add(INLET, SOLID)
-    for index in RADIATOR.values():
+    add(RISER)
+    for index in list(RADIATOR.values()) + list(INLET.values()):
         add(index)
     for first, wide, deep in STRUCTURES.values():
         for cell in range(wide * deep):
@@ -185,16 +192,18 @@ def main():
     for mask in range(16):
         single(f"pipe_{mask}", mask)
     single("pump", PUMP)
-    single("inlet", INLET)
+    single("riser", RISER)
     for facing, index in RADIATOR.items():
         single("radiator_" + facing, index)
+    for facing, index in INLET.items():
+        single("inlet_" + facing, index)
     for name in STRUCTURES:
         structure(name)
     tiles_json()
 
     icon(frame(10), "Pipe")
     icon(frame(RADIATOR["N"]), "Radiator")
-    icon(frame(INLET), "Inlet")
+    icon(frame(INLET["N"]), "Inlet")
     icon(frame(PUMP), "Pump")
     icon(assemble("intake"), "Intake")
     icon(assemble("boiler_S"), "Boiler")

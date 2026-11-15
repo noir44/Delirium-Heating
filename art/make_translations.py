@@ -155,17 +155,17 @@ def how(en, ru, ua):
 
 TOOLTIPS = {
     "Tooltip_DelHeat_Pipe": how(
-        "Lies on the ground and carries the water. Laid one by one or as a run between two clicks.",
-        "Лежит на земле и несёт воду. Кладётся по одной или трассой между двумя кликами.",
-        "Лежить на землі й несе воду. Кладеться по одній або трасою між двома кліками."),
+        "Lies on the ground and carries the water. Laid one by one or as a run between two clicks. To cross a road in the air: build a floor one level up, lay the pipes on it and take the floor away.",
+        "Лежит на земле и несёт воду. Кладётся по одной или трассой между двумя кликами. Чтобы пройти над дорогой по воздуху: постройте пол этажом выше, проложите по нему трубы и уберите пол.",
+        "Лежить на землі й несе воду. Кладеться по одній або трасою між двома кліками. Щоб пройти над дорогою в повітрі: збудуйте підлогу поверхом вище, прокладіть нею труби й приберіть підлогу."),
     "Tooltip_DelHeat_Radiator": how(
         "Warms a room when a heat unit with hot water is within range. Needs no pipe of its own.",
         "Греет комнату, если рядом есть тепловой узел с горячей водой. Своя труба не нужна.",
         "Гріє кімнату, якщо поруч є тепловий вузол з гарячою водою. Своя труба не потрібна."),
     "Tooltip_DelHeat_Inlet": how(
-        "Stands at a house on the end of a pipe and feeds the radiators around it.",
-        "Ставится у дома на конце трубы и питает радиаторы вокруг себя.",
-        "Ставиться біля будинку на кінці труби й живить радіатори навколо себе."),
+        "Stands at a wall of a house on the end of a pipe and feeds the radiators around it.",
+        "Ставится у стены дома на конце трубы и питает радиаторы вокруг себя.",
+        "Ставиться біля стіни будинку на кінці труби й живить радіатори навколо себе."),
     "Tooltip_DelHeat_Pump": how(
         "Sends the water further along the pipe. Needs electricity.",
         "Гонит воду дальше по трубе. Нужно электричество.",

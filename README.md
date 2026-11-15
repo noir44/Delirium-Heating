@@ -6,9 +6,10 @@ District heating for a world without grid power: one boiler house heats a whole 
 
 - **Water intake** (2x2 cells, next to a river or a lake): pumps water into the pipes. Every working intake whose water reaches a boiler house adds 200 l a game hour to its tank. Needs electricity.
 - **Boiler house** (2x3 cells): burns fuel and heats the water. It does not burn without water in its tank (1000 l; a burning boiler loses 10 l an hour plus 0.5 per radiator). Anyone lights it or puts it out and loads fuel from the context menu: logs, firewood, planks, branches, charcoal, coke, a propane tank (drained, the empty tank stays) or petrol (poured out of its container). The water warms up by a degree a game minute and cools down slowly when the fire is out.
-- **Pipes** lie on the ground and do not block the way. They join their neighbours by themselves, also the cell above or below (a riser). One kind of pipe carries both the intake's water to the boiler and the hot water from it.
+- **Pipes** lie on the ground and do not block the way. They join their neighbours by themselves. One kind of pipe carries both the intake's water to the boiler and the hot water from it.
+- **Pipes in the air**, to cross a road: build a floor one level up, lay the pipes on it and take the floor away - the pipes stay. A pipe joins the pipe right above or below it, and the lower one shows a riser, so a run goes up, over and down again. A pipe one level up is taken apart from the ground below it.
 - **Pump stations**: the water travels 60 cells of pipe from an intake and 40 from a boiler house; a pump station on the way sends it 80 cells further. A pump needs electricity (a generator in range); without it it is just a pipe.
-- **Heat unit**: stands at a house on the end of a pipe. When hot water reaches it, every radiator within 10 cells of it works (three floors up and down) - no pipes inside the house.
+- **Heat unit**: stands at a wall of a house (any of the four edges of its cell) on the end of a pipe. When hot water reaches it, every radiator within 10 cells of it works (three floors up and down; the radius is the sandbox option `InletRadius`) - no pipes inside the house.
 - **Radiators** stand in the rooms, at any of the four walls. A working one warms the air around it the way a vanilla fireplace does (an `IsoHeatSource`): walls and closed doors stop the heat. They start to warm at 30 degrees of water and give full heat at 80.
 - Fuel: an idle boiler burns 1 unit a game hour, plus 0.05 for every radiator it feeds; a log is 6 units, the furnace holds 500.
 
@@ -19,7 +20,7 @@ Everything is built from the context menu on the ground, **Heating**; a placed t
 - **Players** craft the parts (crafting tab *Heating*, welding) and need a **pipe wrench** on them. Placing takes the part and a little time; taking a thing apart gives the part back. Nothing can be built or taken apart in somebody else's safehouse. Sandbox `PlayersBuild` turns this off.
 - **Admins** build for free and at once, and can fill a boiler with fuel or water.
 - *Pipe here*, or a run: *Pipe run: start here* on one cell, then *Pipe run: lay to here* on another (along x, then along y; up to 200 cells; cells already taken are passed over). The next run starts where the last one ended. *Remove pipes to here* takes a run off.
-- *Radiator here* (at the north, west, south or east wall of the cell), *Heat unit here*, *Pump station here*, *Water intake* (the clicked cell is its near corner), *Boiler house* (front to the south or to the east; the clicked cell is the middle of the front).
+- *Radiator here* and *Heat unit here* (at the north, west, south or east wall of the cell), *Pump station here*, *Water intake* (the clicked cell is its near corner), *Boiler house* (front to the south or to the east; the clicked cell is the middle of the front).
 
 The objects cannot be picked up or broken with a sledgehammer.
 

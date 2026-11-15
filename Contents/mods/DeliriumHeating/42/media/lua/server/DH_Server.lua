@@ -12,6 +12,7 @@
 --   boilers = { [anchor] = { facing, fuel, water, temp, on, by } }
 --   intakes = { [anchor] = { powered, by } }
 --   rads    = { [cell] = facing }
+--   inlets  = { [cell] = facing }
 --   pumps   = { [cell] = true | false }   has power, as last seen
 --
 -- An admin builds for free and anywhere; a player (sandbox PlayersBuild)
@@ -52,7 +53,7 @@ end
 
 local function state()
 	local s = ModData.getOrCreate(DelHeat.STATE_KEY)
-	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "pumps" }) do
+	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "inlets", "pumps" }) do
 		if type(s[name]) ~= "table" then s[name] = {} end
 	end
 	return s
@@ -377,8 +378,11 @@ local function wantedSprites(s, x, y, z)
 	end
 	local list = {}
 	if kind == PIPE or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask)) end
+	-- The pipe goes on up to the cell above.
+	local above = s.nodes[DelHeat.key(x, y, z + 1)]
+	if above == PIPE or above == PUMP or above == INLET then table.insert(list, DelHeat.riserSprite()) end
 	if kind == PUMP then table.insert(list, DelHeat.pumpSprite()) end
-	if kind == INLET then table.insert(list, DelHeat.inletSprite()) end
+	if kind == INLET then table.insert(list, DelHeat.inletSprite(s.inlets[key])) end
 	return list
 end
 
@@ -419,24 +423,26 @@ local function redraw(s, x, y, z)
 	return true
 end
 
--- Redraws the cells and their neighbours, each once.
+-- Redraws the cells, their neighbours and the cell below each (its riser),
+-- each once.
 local function redrawAround(s, cells)
 	local done = {}
 	for _, cell in ipairs(cells) do
-		local spots = { { 0, 0 }, { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }
+		local spots = { { 0, 0, 0 }, { 0, -1, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { -1, 0, 0 }, { 0, 0, -1 } }
 		for _, d in ipairs(spots) do
-			local x, y = cell.x + d[1], cell.y + d[2]
-			local key = DelHeat.key(x, y, cell.z)
+			local x, y, z = cell.x + d[1], cell.y + d[2], cell.z + d[3]
+			local key = DelHeat.key(x, y, z)
 			if not done[key] then
 				done[key] = true
-				redraw(s, x, y, cell.z)
+				redraw(s, x, y, z)
 			end
 		end
 	end
 end
 
--- nil when a pipe or a radiator may go on the square, otherwise a
--- translation key.
+-- nil when a pipe, a radiator or a heat unit may go on the square,
+-- otherwise a translation key. A floor is wanted only now: a pipe laid on a
+-- floor in the air stays when the floor is taken away.
 local function blockedThin(s, square, x, y, z)
 	if not square then return "IGUI_DelHeat_NotLoaded" end
 	if s.nodes[DelHeat.key(x, y, z)] then return "IGUI_DelHeat_Occupied" end
@@ -502,7 +508,7 @@ function Commands.place(player, args)
 	if name == "boiler" then
 		facing = oneOf(DelHeat.BOILER_FACINGS, args.facing)
 		if not facing then return end
-	elseif name == "radiator" then
+	elseif name == "radiator" or name == "inlet" then
 		facing = oneOf(DelHeat.RADIATOR_FACINGS, args.facing) or "N"
 	end
 	if structure then
@@ -516,7 +522,7 @@ function Commands.place(player, args)
 	for _, cell in ipairs(cells) do
 		local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
 		local why
-		if name == "pipe" or name == "radiator" then
+		if name == "pipe" or name == "radiator" or name == "inlet" then
 			why = blockedThin(s, square, cell.x, cell.y, cell.z)
 		else
 			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
@@ -552,6 +558,7 @@ function Commands.place(player, args)
 			s.pumps[ckey] = hasPower(getCell():getGridSquare(x, y, z))
 		elseif name == "inlet" then
 			s.nodes[ckey] = INLET
+			s.inlets[ckey] = facing
 		elseif name == "radiator" then
 			s.nodes[ckey] = RADIATOR
 			s.rads[ckey] = facing
@@ -694,6 +701,7 @@ function Commands.remove(player, args)
 		s.nodes[ckey] = nil
 		s.cells[ckey] = nil
 		s.rads[ckey] = nil
+		s.inlets[ckey] = nil
 		s.pumps[ckey] = nil
 	end
 	local itemType = kind and DelHeat.ITEM[DelHeat.NAME[kind] or ""]

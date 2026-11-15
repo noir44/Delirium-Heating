@@ -270,6 +270,17 @@ local TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500,
 local function act(player, square, command, args, time)
 	if DelHeat.isAdmin(player) then
 		DelHeat.send(command, args)
+		return
+	end
+	-- A pipe in the air has no floor to walk up to: it is worked on from
+	-- below, from where the player stands.
+	if square:getZ() ~= math.floor(player:getZ()) or not square:getFloor() then
+		local dx, dy = square:getX() + 0.5 - player:getX(), square:getY() + 0.5 - player:getY()
+		if dx * dx + dy * dy > DelHeat.BUILD_REACH * DelHeat.BUILD_REACH then
+			player:setHaloNote(getText("IGUI_DelHeat_ComeCloser"), 255, 255, 255, 300)
+			return
+		end
+		ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time))
 	elseif luautils.walkAdj(player, square, true) then
 		ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time))
 	end
@@ -411,7 +422,7 @@ local function buildMenu(context, player, square, admin, hasTool)
 	place(sub, "IGUI_DelHeat_PlacePipe", "pipe")
 	if admin or have.pipe > 0 then lineOptions(sub, player, square, admin, hasTool, have.pipe) end
 	placeFacing("IGUI_DelHeat_PlaceRadiator", "radiator", DelHeat.RADIATOR_FACINGS, "IGUI_DelHeat_Wall_")
-	place(sub, "IGUI_DelHeat_PlaceInlet", "inlet")
+	placeFacing("IGUI_DelHeat_PlaceInlet", "inlet", DelHeat.RADIATOR_FACINGS, "IGUI_DelHeat_Wall_")
 	place(sub, "IGUI_DelHeat_PlacePump", "pump")
 	place(sub, "IGUI_DelHeat_PlaceIntake", "intake")
 	placeFacing("IGUI_DelHeat_PlaceBoiler", "boiler", DelHeat.BOILER_FACINGS, "IGUI_DelHeat_Front_")

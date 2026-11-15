@@ -93,12 +93,9 @@
       }
     },
     {
-      "index": 17,
-      "png": "frames/delheat_01_17.png",
-      "props": {
-        "solidtrans": "",
-        "BlocksPlacement": ""
-      }
+      "index": 41,
+      "png": "frames/delheat_01_41.png",
+      "props": {}
     },
     {
       "index": 18,
@@ -118,6 +115,26 @@
     {
       "index": 21,
       "png": "frames/delheat_01_21.png",
+      "props": {}
+    },
+    {
+      "index": 17,
+      "png": "frames/delheat_01_17.png",
+      "props": {}
+    },
+    {
+      "index": 38,
+      "png": "frames/delheat_01_38.png",
+      "props": {}
+    },
+    {
+      "index": 39,
+      "png": "frames/delheat_01_39.png",
+      "props": {}
+    },
+    {
+      "index": 40,
+      "png": "frames/delheat_01_40.png",
       "props": {}
     },
     {

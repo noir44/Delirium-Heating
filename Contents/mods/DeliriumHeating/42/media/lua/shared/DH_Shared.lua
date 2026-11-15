@@ -14,13 +14,20 @@
 -- pipe of their own: their cell shows a pipe sprite (by its neighbours) and
 -- the device sprite on top of it.
 --
+-- Pipes in the air: a pipe needs a floor only while it is laid. Players
+-- build a floor on the level above, lay the pipes and take the floor away;
+-- the pipes stay. A pipe joins the pipe right above or below it, and the
+-- lower one shows a riser.
+--
 -- Tiles: tileset delheat_01,
 --   0..15   pipe by neighbour mask (N = 1, E = 2, S = 4, W = 8),
---   16      pump, 17 heat unit,
---   18..21  radiator at the north, west, south, east edge of its cell,
+--   16      pump,
+--   17, 38..40  heat unit at the north, west, south, east edge of its cell,
+--   18..21  radiator at the same four edges,
 --   22..27  boiler with its front to the south, 3 wide x 2 deep (dy * 3 + dx),
 --   28..33  boiler with its front to the east, 2 wide x 3 deep (dy * 2 + dx),
---   34..37  water intake, 2 x 2 (dy * 2 + dx);
+--   34..37  water intake, 2 x 2 (dy * 2 + dx),
+--   41      riser: the pipe going up to the cell above;
 -- (dx, dy) counted from the structure's north-west cell, its anchor.
 
 DelHeat = DelHeat or {}
@@ -42,10 +49,12 @@ DelHeat.ITEM = {
 DelHeat.TOOL = "Base.PipeWrench"
 
 DelHeat.SPRITE_PUMP = 16
-DelHeat.SPRITE_INLET = 17
+DelHeat.SPRITE_INLET = { N = 17, W = 38, S = 39, E = 40 }
+DelHeat.SPRITE_RISER = 41
 DelHeat.SPRITE_RADIATOR = { N = 18, W = 19, S = 20, E = 21 }
 DelHeat.SPRITE_BOILER = { S = 22, E = 28 }
 DelHeat.SPRITE_INTAKE = 34
+-- The four edges of a cell a radiator or a heat unit stands at.
 DelHeat.RADIATOR_FACINGS = { "N", "W", "S", "E" }
 DelHeat.BOILER_FACINGS = { "S", "E" }
 DelHeat.BOILER_SIZE = { S = { w = 3, h = 2 }, E = { w = 2, h = 3 } }
@@ -214,8 +223,12 @@ function DelHeat.pumpSprite()
 	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_PUMP)
 end
 
-function DelHeat.inletSprite()
-	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_INLET)
+function DelHeat.inletSprite(facing)
+	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_INLET[facing] or DelHeat.SPRITE_INLET.N)
+end
+
+function DelHeat.riserSprite()
+	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_RISER)
 end
 
 function DelHeat.radiatorSprite(facing)
@@ -237,9 +250,11 @@ function DelHeat.parseSprite(name)
 	if not name or string.sub(name, 1, #DelHeat.TILESET) ~= DelHeat.TILESET then return nil end
 	local index = tonumber(string.sub(name, #DelHeat.TILESET + 1))
 	if not index or index < 0 then return nil end
-	if index <= 15 then return { kind = DelHeat.PIPE, pipe = true } end
+	if index <= 15 or index == DelHeat.SPRITE_RISER then return { kind = DelHeat.PIPE, pipe = true } end
 	if index == DelHeat.SPRITE_PUMP then return { kind = DelHeat.PUMP } end
-	if index == DelHeat.SPRITE_INLET then return { kind = DelHeat.INLET } end
+	for facing, sprite in pairs(DelHeat.SPRITE_INLET) do
+		if index == sprite then return { kind = DelHeat.INLET, facing = facing } end
+	end
 	for facing, sprite in pairs(DelHeat.SPRITE_RADIATOR) do
 		if index == sprite then return { kind = DelHeat.RADIATOR, facing = facing } end
 	end

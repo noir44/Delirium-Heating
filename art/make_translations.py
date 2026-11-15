@@ -96,6 +96,11 @@ IG = {
     "Removed": ("Removed", "Убрано", "Прибрано"),
     "NoRights": ("Only an admin builds the heating here", "Строить отопление здесь может только админ",
                  "Будувати опалення тут може лише адмін"),
+    # Delirium Economy: the activity the admin ticks for an organization.
+    "Activity": ("Heat supply", "Теплоснабжение", "Теплопостачання"),
+    "NotService": ("Only the staff of a heat supply organization build and take apart the heating network",
+                   "Сеть отопления строят и разбирают только сотрудники организации теплоснабжения",
+                   "Мережу опалення будують і розбирають лише працівники організації теплопостачання"),
     "NeedTool": ("A pipe wrench is needed", "Нужен разводной ключ", "Потрібен розвідний ключ"),
     "NeedItem": ("The part for it is not on you", "Нужной детали с собой нет", "Потрібної деталі з собою немає"),
     "NeedWater": ("A water intake goes next to a river or a lake", "Водозабор ставится у реки или озера",
@@ -149,12 +154,22 @@ HOW = ("Right-click the ground: Heating. A pipe wrench is needed.",
        "ПКМ по землі: «Опалення». Потрібен розвідний ключ.")
 
 
+# Everything but a radiator.
+SERVICE = ("Built only by the staff of a heat supply organization.",
+           "Ставят только сотрудники организации теплоснабжения.",
+           "Ставлять лише працівники організації теплопостачання.")
+
+
 def how(en, ru, ua):
     return (en + " " + HOW[0], ru + " " + HOW[1], ua + " " + HOW[2])
 
 
+def net(en, ru, ua):
+    return how(en + " " + SERVICE[0], ru + " " + SERVICE[1], ua + " " + SERVICE[2])
+
+
 TOOLTIPS = {
-    "Tooltip_DelHeat_Pipe": how(
+    "Tooltip_DelHeat_Pipe": net(
         "Lies on the ground and carries the water. Laid one by one or as a run between two clicks. To cross a road in the air: build a floor one level up, lay the pipes on it and take the floor away.",
         "Лежит на земле и несёт воду. Кладётся по одной или трассой между двумя кликами. Чтобы пройти над дорогой по воздуху: постройте пол этажом выше, проложите по нему трубы и уберите пол.",
         "Лежить на землі й несе воду. Кладеться по одній або трасою між двома кліками. Щоб пройти над дорогою в повітрі: збудуйте підлогу поверхом вище, прокладіть нею труби й приберіть підлогу."),
@@ -162,19 +177,19 @@ TOOLTIPS = {
         "Warms a room when a heat unit with hot water is within range. Needs no pipe of its own.",
         "Греет комнату, если рядом есть тепловой узел с горячей водой. Своя труба не нужна.",
         "Гріє кімнату, якщо поруч є тепловий вузол з гарячою водою. Своя труба не потрібна."),
-    "Tooltip_DelHeat_Inlet": how(
+    "Tooltip_DelHeat_Inlet": net(
         "Stands at a wall of a house on the end of a pipe and feeds the radiators around it.",
         "Ставится у стены дома на конце трубы и питает радиаторы вокруг себя.",
         "Ставиться біля стіни будинку на кінці труби й живить радіатори навколо себе."),
-    "Tooltip_DelHeat_Pump": how(
+    "Tooltip_DelHeat_Pump": net(
         "Sends the water further along the pipe. Needs electricity.",
         "Гонит воду дальше по трубе. Нужно электричество.",
         "Жене воду далі трубою. Потрібна електрика."),
-    "Tooltip_DelHeat_Intake": how(
+    "Tooltip_DelHeat_Intake": net(
         "2x2 cells by a river or a lake: pumps water into the pipes to a boiler house. Needs electricity.",
         "2x2 клетки у реки или озера: качает воду по трубам к котельной. Нужно электричество.",
         "2x2 клітинки біля річки чи озера: качає воду трубами до котельні. Потрібна електрика."),
-    "Tooltip_DelHeat_Boiler": how(
+    "Tooltip_DelHeat_Boiler": net(
         "2x3 cells: burns fuel and heats the water for a whole neighbourhood.",
         "2x3 клетки: жжёт топливо и греет воду на целый район.",
         "2x3 клітинки: палить паливо й гріє воду на цілий район."),
@@ -184,9 +199,9 @@ SANDBOX = {
     "": ("Delirium Heating", "Delirium Heating", "Delirium Heating"),
     "PlayersBuild": ("Players build the heating", "Игроки строят отопление", "Гравці будують опалення"),
     "PlayersBuild_tooltip": (
-        "With the crafted parts and a pipe wrench; the parts come back when a thing is taken apart. Off: only admins build.",
-        "Из скрафченных деталей и с разводным ключом; при разборке деталь возвращается. Выключено — строят только админы.",
-        "Зі скрафчених деталей і з розвідним ключем; при розбиранні деталь повертається. Вимкнено — будують лише адміни."),
+        "With the crafted parts and a pipe wrench; the parts come back when a thing is taken apart. Radiators: any player. Everything else: the head and staff of an organization with the Heat supply activity (Delirium Economy, ticked by an admin). Off: only admins build.",
+        "Из скрафченных деталей и с разводным ключом; при разборке деталь возвращается. Радиаторы — любой игрок. Всё остальное — голова и сотрудники организации с видом деятельности «Теплоснабжение» (Delirium Economy, галочку ставит админ). Выключено — строят только админы.",
+        "Зі скрафчених деталей і з розвідним ключем; при розбиранні деталь повертається. Радіатори — будь-який гравець. Усе інше — голова і працівники організації з видом діяльності «Теплопостачання» (Delirium Economy, галочку ставить адмін). Вимкнено — будують лише адміни."),
     "FuelCapacity": ("Furnace capacity, fuel units", "Вместимость топки, единиц топлива",
                      "Місткість топки, одиниць палива"),
     "FuelCapacity_tooltip": (

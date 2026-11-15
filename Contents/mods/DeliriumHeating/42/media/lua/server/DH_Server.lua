@@ -17,7 +17,8 @@
 --
 -- An admin builds for free and anywhere; a player (sandbox PlayersBuild)
 -- needs a pipe wrench and the item, stands next to the place and gets the
--- item back when taking a thing apart.
+-- item back when taking a thing apart. Anything but a radiator also takes
+-- the head or staff of a heat supply organization (DelHeat.isService).
 --
 -- media/lua/server/ is also executed by connected clients, hence the guard
 -- (see E:\mods\CLAUDE.md).
@@ -118,11 +119,16 @@ end
 -- The builder: rights, tool, items
 -- ---------------------------------------------------------------------------
 
--- "admin", "player", or nil after telling the player why not.
-local function builderOf(player)
+-- Of a part by its name in DelHeat.ITEM: "admin", "player", or nil after
+-- telling the player why not.
+local function builderOf(player, name)
 	if DelHeat.isAdmin(player) then return "admin" end
 	if not DelHeat.playersBuild() then
 		notify(player, "IGUI_DelHeat_NoRights")
+		return nil
+	end
+	if DelHeat.needsService(name) and not DelHeat.isService(player) then
+		notify(player, "IGUI_DelHeat_NotService")
 		return nil
 	end
 	if not DelHeat.hasTool(player) then
@@ -495,12 +501,12 @@ end
 -- anchor's south-east: the middle of a boiler's front, the near corner of
 -- an intake.
 function Commands.place(player, args)
-	local who = builderOf(player)
-	if not who then return end
 	local x, y, z = coords(args)
 	local name = args.kind
 	local itemType = DelHeat.ITEM[name]
 	if not x or not itemType then return end
+	local who = builderOf(player, name)
+	if not who then return end
 	local s = state()
 
 	local structure = name == "boiler" or name == "intake"
@@ -574,7 +580,7 @@ end
 
 -- The run of a line command: who, state, cells; nil after telling why not.
 local function lineOf(player, args)
-	local who = builderOf(player)
+	local who = builderOf(player, "pipe")
 	if not who then return nil end
 	local x1, y1, z = coords(args, "x1", "y1")
 	local x2, y2 = coords(args, "x2", "y2")
@@ -655,14 +661,16 @@ end
 -- { x, y, z (any cell) }: removes what stands there, a structure whole. A
 -- player gets the item back.
 function Commands.remove(player, args)
-	local who = builderOf(player)
-	if not who then return end
 	local x, y, z = coords(args)
 	if not x then return end
 	local s = state()
 	local key = DelHeat.key(x, y, z)
 	local square = getCell():getGridSquare(x, y, z)
 	local kind = s.nodes[key]
+	-- Sprites without a record are the admin's to clear.
+	if not kind and not DelHeat.isAdmin(player) then return end
+	local who = builderOf(player, DelHeat.NAME[kind or PIPE])
+	if not who then return end
 	local cells = { { x = x, y = y, z = z } }
 	local anchor, size = s.cells[key], nil
 	if anchor and s.boilers[anchor] then

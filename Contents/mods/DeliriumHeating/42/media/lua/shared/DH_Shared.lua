@@ -29,6 +29,12 @@
 --   34..37  water intake, 2 x 2 (dy * 2 + dx),
 --   41      riser: the pipe going up to the cell above;
 -- (dx, dy) counted from the structure's north-west cell, its anchor.
+--
+-- Who builds: an admin anything; any player the radiators; the head and
+-- staff of an organization with the heat supply activity (Delirium Economy)
+-- the rest - pipes, heat units, pumps, intakes, boiler houses.
+
+require "DE_Shared"
 
 DelHeat = DelHeat or {}
 DelHeat.MODULE = "DelHeat"
@@ -47,6 +53,11 @@ DelHeat.ITEM = {
 }
 -- The tool a player needs on them to build or take apart.
 DelHeat.TOOL = "Base.PipeWrench"
+
+-- The organization activity (Delirium Economy) the admin ticks for a heat
+-- supply company: only its head and staff build and take apart the network.
+DelHeat.ACTIVITY = "heating"
+if DelEcon.addActivity then DelEcon.addActivity(DelHeat.ACTIVITY, "IGUI_DelHeat_Activity") end
 
 DelHeat.SPRITE_PUMP = 16
 DelHeat.SPRITE_INLET = { N = 17, W = 38, S = 39, E = 40 }
@@ -306,17 +317,33 @@ function DelHeat.heatLevel(temp)
 end
 
 -- ---------------------------------------------------------------------------
--- Admin rights: same test as Delirium Shops, kept here so the mod stands
--- alone.
+-- Rights
 -- ---------------------------------------------------------------------------
 
 function DelHeat.isAdmin(player)
+	return DelShops.hasAdminRights(player)
+end
+
+-- Parts by their name in DelHeat.ITEM: a radiator is anybody's to put in
+-- their rooms, the rest is the network and takes a heat supply company.
+function DelHeat.needsService(name)
+	return name ~= "radiator"
+end
+
+-- Head or staff of an organization with the heat supply activity. Admin
+-- rights are asked separately. The state is the server's own on the server
+-- and Economy's read-only copy on a client.
+function DelHeat.isService(player)
 	if not player then return false end
-	if player.getAccessLevel and player:getAccessLevel() == "admin" then return true end
-	local role = player.getRole and player:getRole()
-	if role and role.hasCapability and Capability and Capability.CanSetupNonPVPZone then
-		if role:hasCapability(Capability.CanSetupNonPVPZone) then return true end
+	-- A Delirium Economy without activities: no filter.
+	if not DelEcon.hasActivity then return true end
+	local state = DelEcon.getState()
+	for _, id in ipairs(DelEcon.hallIds(state)) do
+		local hall = state.halls[id]
+		if DelEcon.hasActivity(hall, DelHeat.ACTIVITY)
+			and (DelEcon.isMayorOf(hall, player) or DelEcon.isStaffOf(hall, player)) then
+			return true
+		end
 	end
-	if role and role.hasAdminPower and role:hasAdminPower() then return true end
 	return false
 end

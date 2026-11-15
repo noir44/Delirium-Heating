@@ -1,6 +1,6 @@
 # Delirium Heating
 
-Build 42 mod for the Delirium server. No dependencies.
+Build 42 mod for the Delirium server. Requires **Delirium Economy** (and through it Delirium Shops).
 
 District heating for a world without grid power: one boiler house heats a whole neighbourhood.
 
@@ -18,6 +18,7 @@ District heating for a world without grid power: one boiler house heats a whole 
 Everything is built from the context menu on the ground, **Heating**; a placed thing has its own menu (state in the tooltip, *Check the supply*, *Take apart*).
 
 - **Players** craft the parts (crafting tab *Heating*, welding) and need a **pipe wrench** on them. Placing takes the part and a little time; taking a thing apart gives the part back. Nothing can be built or taken apart in somebody else's safehouse. Sandbox `PlayersBuild` turns this off.
+- **Radiators** are anybody's to put in and take out. **Everything else** - pipes, heat units, pump stations, water intakes, boiler houses - is built and taken apart only by the head and staff of an organization with the **Heat supply** activity. An admin ticks it in the organization window of Delirium Economy, the same way as *Road repair* of Delirium Roads. Other players see those parts greyed out in the menu with the reason. Lighting a boiler and loading fuel stay open to everyone.
 - **Admins** build for free and at once, and can fill a boiler with fuel or water.
 - *Pipe here*, or a run: *Pipe run: start here* on one cell, then *Pipe run: lay to here* on another (along x, then along y; up to 200 cells; cells already taken are passed over). The next run starts where the last one ended. *Remove pipes to here* takes a run off.
 - *Radiator here* and *Heat unit here* (at the north, west, south or east wall of the cell), *Pump station here*, *Water intake* (the clicked cell is its near corner), *Boiler house* (front to the south or to the east; the clicked cell is the middle of the front).
@@ -37,7 +38,7 @@ The objects cannot be picked up or broken with a sledgehammer.
 
 | Option | Default | Meaning |
 |---|---|---|
-| `PlayersBuild` | true | players build with crafted parts; off - admins only |
+| `PlayersBuild` | true | players build with crafted parts (radiators anyone, the rest a heat supply organization); off - admins only |
 | `FuelCapacity` | 500 | fuel units a boiler house holds; one unit is one game hour of an idle boiler |
 | `BurnPerHour` | 1 | units a lit boiler burns each game hour |
 | `BurnPerRadiator` | 0.05 | extra units per hour for every radiator fed |

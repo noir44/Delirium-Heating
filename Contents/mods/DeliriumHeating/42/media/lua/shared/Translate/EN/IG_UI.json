@@ -65,6 +65,8 @@
 	"IGUI_DelHeat_Placed": "Placed",
 	"IGUI_DelHeat_Removed": "Removed",
 	"IGUI_DelHeat_NoRights": "Only an admin builds the heating here",
+	"IGUI_DelHeat_Activity": "Heat supply",
+	"IGUI_DelHeat_NotService": "Only the staff of a heat supply organization build and take apart the heating network",
 	"IGUI_DelHeat_NeedTool": "A pipe wrench is needed",
 	"IGUI_DelHeat_NeedItem": "The part for it is not on you",
 	"IGUI_DelHeat_NeedWater": "A water intake goes next to a river or a lake",

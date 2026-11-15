@@ -65,6 +65,8 @@
 	"IGUI_DelHeat_Placed": "Поставлено",
 	"IGUI_DelHeat_Removed": "Убрано",
 	"IGUI_DelHeat_NoRights": "Строить отопление здесь может только админ",
+	"IGUI_DelHeat_Activity": "Теплоснабжение",
+	"IGUI_DelHeat_NotService": "Сеть отопления строят и разбирают только сотрудники организации теплоснабжения",
 	"IGUI_DelHeat_NeedTool": "Нужен разводной ключ",
 	"IGUI_DelHeat_NeedItem": "Нужной детали с собой нет",
 	"IGUI_DelHeat_NeedWater": "Водозабор ставится у реки или озера",

@@ -65,6 +65,8 @@
 	"IGUI_DelHeat_Placed": "Поставлено",
 	"IGUI_DelHeat_Removed": "Прибрано",
 	"IGUI_DelHeat_NoRights": "Будувати опалення тут може лише адмін",
+	"IGUI_DelHeat_Activity": "Теплопостачання",
+	"IGUI_DelHeat_NotService": "Мережу опалення будують і розбирають лише працівники організації теплопостачання",
 	"IGUI_DelHeat_NeedTool": "Потрібен розвідний ключ",
 	"IGUI_DelHeat_NeedItem": "Потрібної деталі з собою немає",
 	"IGUI_DelHeat_NeedWater": "Водозабір ставиться біля річки чи озера",

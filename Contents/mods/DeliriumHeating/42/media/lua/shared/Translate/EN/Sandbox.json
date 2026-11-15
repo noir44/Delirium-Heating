@@ -1,7 +1,7 @@
 {
 	"Sandbox_DelHeat": "Delirium Heating",
 	"Sandbox_DelHeat_PlayersBuild": "Players build the heating",
-	"Sandbox_DelHeat_PlayersBuild_tooltip": "With the crafted parts and a pipe wrench; the parts come back when a thing is taken apart. Off: only admins build.",
+	"Sandbox_DelHeat_PlayersBuild_tooltip": "With the crafted parts and a pipe wrench; the parts come back when a thing is taken apart. Radiators: any player. Everything else: the head and staff of an organization with the Heat supply activity (Delirium Economy, ticked by an admin). Off: only admins build.",
 	"Sandbox_DelHeat_FuelCapacity": "Furnace capacity, fuel units",
 	"Sandbox_DelHeat_FuelCapacity_tooltip": "How much fuel a boiler house holds. One unit is one game hour of an idle boiler.",
 	"Sandbox_DelHeat_BurnPerHour": "Fuel burnt per game hour",

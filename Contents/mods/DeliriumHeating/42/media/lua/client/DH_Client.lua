@@ -337,7 +337,7 @@ local function lineOptions(sub, player, square, admin, hasTool, pipes)
 end
 
 -- Right click on one of our things.
-local function nodeMenu(context, player, node, square, admin, canBuild, hasTool)
+local function nodeMenu(context, player, node, square, admin, canBuild, hasTool, service)
 	local name = DelHeat.NAME[node.kind]
 	local parent = context:addOption(getText("IGUI_DelHeat_Kind_" .. name))
 	local lines = infoLines(node)
@@ -379,16 +379,21 @@ local function nodeMenu(context, player, node, square, admin, canBuild, hasTool)
 		sub():addOption(getText("IGUI_DelHeat_Probe"), MODULE, function() DelHeat.send("probe", args) end)
 	end
 	if not canBuild then return end
-	if node.kind == PIPE or node.kind == PUMP or node.kind == INLET then
+	if service and (node.kind == PIPE or node.kind == PUMP or node.kind == INLET) then
 		lineOptions(sub(), player, square, admin, hasTool, DelHeat.countOf(player, DelHeat.ITEM.pipe))
 	end
 	local remove = sub():addOption(getText(admin and "IGUI_DelHeat_Remove" or "IGUI_DelHeat_Dismantle"), MODULE,
 		function() act(player, square, "remove", args, TIME[name] or 200) end)
-	if not admin and not hasTool then disable(remove, "IGUI_DelHeat_NeedTool") end
+	if not service and DelHeat.needsService(name) then
+		disable(remove, "IGUI_DelHeat_NotService")
+	elseif not admin and not hasTool then
+		disable(remove, "IGUI_DelHeat_NeedTool")
+	end
 end
 
--- Right click on bare ground with something to build.
-local function buildMenu(context, player, square, admin, hasTool)
+-- Right click on bare ground with something to build. A part the player
+-- carries but may not build is greyed out with the reason.
+local function buildMenu(context, player, square, admin, hasTool, service)
 	local have = {}
 	local any = admin
 	for name, itemType in pairs(DelHeat.ITEM) do
@@ -406,7 +411,11 @@ local function buildMenu(context, player, square, admin, hasTool)
 		local option = menu:addOption(getText(textKey), MODULE, function()
 			act(player, square, "place", { x = x, y = y, z = z, kind = name, facing = facing }, TIME[name])
 		end)
-		if not admin and not hasTool then disable(option, "IGUI_DelHeat_NeedTool") end
+		if not service and DelHeat.needsService(name) then
+			disable(option, "IGUI_DelHeat_NotService")
+		elseif not admin and not hasTool then
+			disable(option, "IGUI_DelHeat_NeedTool")
+		end
 	end
 
 	local function placeFacing(textKey, name, facings, prefix)
@@ -420,7 +429,7 @@ local function buildMenu(context, player, square, admin, hasTool)
 	end
 
 	place(sub, "IGUI_DelHeat_PlacePipe", "pipe")
-	if admin or have.pipe > 0 then lineOptions(sub, player, square, admin, hasTool, have.pipe) end
+	if admin or (service and have.pipe > 0) then lineOptions(sub, player, square, admin, hasTool, have.pipe) end
 	placeFacing("IGUI_DelHeat_PlaceRadiator", "radiator", DelHeat.RADIATOR_FACINGS, "IGUI_DelHeat_Wall_")
 	placeFacing("IGUI_DelHeat_PlaceInlet", "inlet", DelHeat.RADIATOR_FACINGS, "IGUI_DelHeat_Wall_")
 	place(sub, "IGUI_DelHeat_PlacePump", "pump")
@@ -447,10 +456,12 @@ local function onFill(playerNum, context, worldobjects, test)
 	local admin = DelHeat.isAdmin(player)
 	local canBuild = admin or DelHeat.playersBuild()
 	local hasTool = admin or DelHeat.hasTool(player)
+	-- May build the network, not only radiators.
+	local service = admin or DelHeat.isService(player)
 	if node then
-		nodeMenu(context, player, node, square, admin, canBuild, hasTool)
+		nodeMenu(context, player, node, square, admin, canBuild, hasTool, service)
 	elseif canBuild then
-		buildMenu(context, player, square, admin, hasTool)
+		buildMenu(context, player, square, admin, hasTool, service)
 	end
 end
 Events.OnFillWorldObjectContextMenu.Add(onFill)

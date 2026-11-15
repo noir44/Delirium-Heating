@@ -21,7 +21,7 @@
 --
 -- Tiles: tileset delheat_01,
 --   0..15   pipe by neighbour mask (N = 1, E = 2, S = 4, W = 8),
---   16      pump,
+--   16, 42  pump along an east-west pipe, along a north-south one,
 --   17, 38..40  heat unit at the north, west, south, east edge of its cell,
 --   18..21  radiator at the same four edges,
 --   22..27  boiler with its front to the south, 3 wide x 2 deep (dy * 3 + dx),
@@ -59,7 +59,9 @@ DelHeat.TOOL = "Base.PipeWrench"
 DelHeat.ACTIVITY = "heating"
 if DelEcon.addActivity then DelEcon.addActivity(DelHeat.ACTIVITY, "IGUI_DelHeat_Activity") end
 
-DelHeat.SPRITE_PUMP = 16
+-- By the pipe a pump stands along: "E" east-west, "S" north-south.
+DelHeat.SPRITE_PUMP = { E = 16, S = 42 }
+DelHeat.PUMP_FACINGS = { "E", "S" }
 DelHeat.SPRITE_INLET = { N = 17, W = 38, S = 39, E = 40 }
 DelHeat.SPRITE_RISER = 41
 DelHeat.SPRITE_RADIATOR = { N = 18, W = 19, S = 20, E = 21 }
@@ -230,8 +232,8 @@ function DelHeat.pipeSprite(mask)
 	return DelHeat.TILESET .. tostring(mask)
 end
 
-function DelHeat.pumpSprite()
-	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_PUMP)
+function DelHeat.pumpSprite(facing)
+	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_PUMP[facing] or DelHeat.SPRITE_PUMP.E)
 end
 
 function DelHeat.inletSprite(facing)
@@ -262,7 +264,9 @@ function DelHeat.parseSprite(name)
 	local index = tonumber(string.sub(name, #DelHeat.TILESET + 1))
 	if not index or index < 0 then return nil end
 	if index <= 15 or index == DelHeat.SPRITE_RISER then return { kind = DelHeat.PIPE, pipe = true } end
-	if index == DelHeat.SPRITE_PUMP then return { kind = DelHeat.PUMP } end
+	for facing, sprite in pairs(DelHeat.SPRITE_PUMP) do
+		if index == sprite then return { kind = DelHeat.PUMP, facing = facing } end
+	end
 	for facing, sprite in pairs(DelHeat.SPRITE_INLET) do
 		if index == sprite then return { kind = DelHeat.INLET, facing = facing } end
 	end
@@ -300,6 +304,38 @@ function DelHeat.nodeAt(square)
 	local x, y, z = square:getX(), square:getY(), square:getZ()
 	if found.dx then x, y = x - found.dx, y - found.dy end
 	return { kind = found.kind, facing = found.facing, x = x, y = y, z = z, key = DelHeat.key(x, y, z) }
+end
+
+-- Where a part clicked at (x, y) goes: its north-west cell and its size.
+-- A boiler and an intake are clicked on the cell next to the anchor's
+-- south-east: the middle of a boiler's front, the near corner of an intake.
+function DelHeat.anchorOf(name, facing, x, y)
+	if name == "boiler" then return x - 1, y - 1, DelHeat.sizeOf(DelHeat.BOILER, facing) end
+	if name == "intake" then return x - 1, y - 1, DelHeat.INTAKE_SIZE end
+	return x, y, { w = 1, h = 1 }
+end
+
+-- Cells from (x1, y1) to (x2, y2): along x first, then along y.
+function DelHeat.path(x1, y1, x2, y2, z)
+	local out = {}
+	local x, y = x1, y1
+	table.insert(out, { x = x, y = y, z = z })
+	while x ~= x2 do
+		x = x + (x2 > x and 1 or -1)
+		table.insert(out, { x = x, y = y, z = z })
+	end
+	while y ~= y2 do
+		y = y + (y2 > y and 1 or -1)
+		table.insert(out, { x = x, y = y, z = z })
+	end
+	return out
+end
+
+function DelHeat.isWater(square)
+	local floor = square and square:getFloor()
+	local sprite = floor and floor:getSprite()
+	local props = sprite and sprite:getProperties()
+	return props ~= nil and props:has(IsoFlagType.water)
 end
 
 -- Distance from a point to a footprint at (x, y), 0 inside it.

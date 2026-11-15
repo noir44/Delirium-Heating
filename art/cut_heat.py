@@ -24,7 +24,8 @@ SCALE = 4
 # some alpha. PZ sprites carry only a faint contact shadow.
 SHADOW = 0.45
 
-PUMP = 16
+# Along an east-west pipe, along a north-south one.
+PUMP = {"E": 16, "S": 42}
 INLET = {"N": 17, "W": 38, "S": 39, "E": 40}
 RISER = 41
 # One level up is 192 px at 2x.
@@ -133,7 +134,7 @@ def scene():
 
     nodes = {(x, 3, 0) for x in range(0, 7)} | {(3, y, 0) for y in range(0, 7)} | {(6, y, 0) for y in range(3, 6)}
     nodes |= {(0, 4, 0), (0, 5, 0), (0, 9, 0), (0, 10, 0)} | {(0, y, 1) for y in range(5, 10)}
-    devices = {(6, 5, 0): INLET["E"], (4, 3, 0): PUMP, (3, 0, 0): INLET["N"], (3, 6, 0): INLET["S"], (0, 10, 0): INLET["W"]}
+    devices = {(6, 5, 0): INLET["E"], (4, 3, 0): PUMP["E"], (3, 5, 0): PUMP["S"], (3, 0, 0): INLET["N"], (3, 6, 0): INLET["S"], (0, 10, 0): INLET["W"]}
     for (x, y, z) in nodes:
         mask = sum(bit for bit, (dx, dy) in ((1, (0, -1)), (2, (1, 0)), (4, (0, 1)), (8, (-1, 0)))
                    if (x + dx, y + dy, z) in nodes)
@@ -175,7 +176,8 @@ def tiles_json():
 
     for mask in range(16):
         add(mask)
-    add(PUMP, SOLID)
+    for index in PUMP.values():
+        add(index, SOLID)
     add(RISER)
     for index in list(RADIATOR.values()) + list(INLET.values()):
         add(index)
@@ -191,7 +193,8 @@ def main():
     os.makedirs(FRAMES, exist_ok=True)
     for mask in range(16):
         single(f"pipe_{mask}", mask)
-    single("pump", PUMP)
+    single("pump", PUMP["E"])
+    single("pump_S", PUMP["S"])
     single("riser", RISER)
     for facing, index in RADIATOR.items():
         single("radiator_" + facing, index)
@@ -204,7 +207,7 @@ def main():
     icon(frame(10), "Pipe")
     icon(frame(RADIATOR["N"]), "Radiator")
     icon(frame(INLET["N"]), "Inlet")
-    icon(frame(PUMP), "Pump")
+    icon(frame(PUMP["E"]), "Pump")
     icon(assemble("intake"), "Intake")
     icon(assemble("boiler_S"), "Boiler")
 

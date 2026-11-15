@@ -1,5 +1,5 @@
 # Models and renders every Delirium Heating sprite with the PZ camera:
-# 16 pipes (by neighbour mask), the riser, the pump, 4 heat units, 4 radiators,
+# 16 pipes (by neighbour mask), the riser, 2 pumps, 4 heat units, 4 radiators,
 # 2 boiler houses, the water intake.
 #   blender --background --factory-startup --python render_heat.py -- <out_dir> [name ...]
 # Writes <out_dir>/<name>_color.png (4x) and, for the boilers, <name>_mask.png
@@ -225,7 +225,8 @@ def build_radiator(degrees):
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
-def build_pump():
+def build_pump(degrees):
+    # Along the east-west pipe; turned for a north-south one.
     y, z = -0.5, 0.30
     box(0.16, 0.84, -0.70, -0.30, 0.0, 0.09, M["concrete"])
     # Motor with cooling fins.
@@ -247,6 +248,7 @@ def build_pump():
     cyl((0.86, y, z), (0.88, y, z), 0.105, M["dark"], 20)
     cyl((0.685, y, z + 0.18), (0.685, y, z + 0.30), 0.07, M["steel"], 20)
     cyl((0.685, y, z + 0.30), (0.685, y, z + 0.32), 0.10, M["dark"], 20)
+    transform(turn_about((0.5, -0.5, 0), degrees))
 
 
 def build_inlet(degrees):
@@ -536,7 +538,8 @@ materials()
 # cell's centre is 32 px above the frame's bottom, 96 px below the centre.
 for mask in range(16):
     shoot("pipe_%d" % mask, lambda: build_pipe(mask), 256, 96)
-shoot("pump", build_pump, 256, 96)
+shoot("pump", lambda: build_pump(0), 256, 96)
+shoot("pump_S", lambda: build_pump(270), 256, 96)
 shoot("riser", build_riser, 256, 96)
 for facing, degrees in (("N", 0), ("W", 90), ("S", 180), ("E", 270)):
     shoot("radiator_" + facing, lambda: build_radiator(degrees), 256, 96)

@@ -5,23 +5,40 @@ Build 42 mod for the Delirium server. Requires **Delirium Economy** (and through
 District heating for a world without grid power: one boiler house heats a whole neighbourhood.
 
 - **Water intake** (2x2 cells, next to a river or a lake): pumps water into the pipes. Every working intake whose water reaches a boiler house adds 200 l a game hour to its tank. Needs electricity.
-- **Boiler house** (2x3 cells): burns fuel and heats the water. It does not burn without water in its tank (1000 l; a burning boiler loses 10 l an hour plus 0.5 per radiator). Anyone lights it or puts it out and loads fuel from the context menu: logs, firewood, planks, branches, charcoal, coke, a propane tank (drained, the empty tank stays) or petrol (poured out of its container). The water warms up by a degree a game minute and cools down slowly when the fire is out.
+- **Boiler house** (2x3 cells): burns fuel and heats the water. It does not burn without water in its tank (1000 l; a burning boiler loses 10 l an hour plus 0.5 per radiator). Anyone lights it or puts it out and loads fuel from its window: logs, firewood, planks, branches, charcoal, coke, a propane tank (drained, the empty tank stays) or petrol (poured out of its container). The water warms up by a degree a game minute and cools down slowly when the fire is out.
 - **Pipes** lie on the ground and do not block the way. They join their neighbours by themselves. One kind of pipe carries both the intake's water to the boiler and the hot water from it.
 - **Pipes in the air**, to cross a road: build a floor one level up, lay the pipes on it and take the floor away - the pipes stay. A pipe joins the pipe right above or below it, and the lower one shows a riser, so a run goes up, over and down again. A pipe one level up is taken apart from the ground below it.
-- **Pump stations**: the water travels 60 cells of pipe from an intake and 40 from a boiler house; a pump station on the way sends it 80 cells further. A pump needs electricity (a generator in range); without it it is just a pipe.
+- **Pump stations**: the water travels 60 cells of pipe from an intake and 40 from a boiler house; a pump station on the way sends it 80 cells further. A pump needs electricity (a generator in range); without it it is just a pipe. It is turned along the pipe it stands on, east-west or north-south.
 - **Heat unit**: stands at a wall of a house (any of the four edges of its cell) on the end of a pipe. When hot water reaches it, every radiator within 10 cells of it works (three floors up and down; the radius is the sandbox option `InletRadius`) - no pipes inside the house.
 - **Radiators** stand in the rooms, at any of the four walls. A working one warms the air around it the way a vanilla fireplace does (an `IsoHeatSource`): walls and closed doors stop the heat. They start to warm at 30 degrees of water and give full heat at 80.
 - Fuel: an idle boiler burns 1 unit a game hour, plus 0.05 for every radiator it feeds; a log is 6 units, the furnace holds 500.
 
 ## Building
 
-Everything is built from the context menu on the ground, **Heating**; a placed thing has its own menu (state in the tooltip, *Check the supply*, *Take apart*).
+A part is put down with a **placement cursor**: right-click the part in the inventory - **Place**, or right-click the ground - **Heating** - the part (an admin finds every part there without carrying it).
+
+- The part is drawn on the ground under the mouse, a boiler house and a water intake with their whole footprint. Red means it cannot go there; a click on a red one says why.
+- **R** turns it, and so does holding the button and dragging: a radiator and a heat unit to any of the four walls of the cell, a pump along either pipe, a boiler house with its front to the south or to the east.
+- Left click places, right click cancels. The cursor stays for pipes and radiators.
+- **Pipes**: a click lays one, holding the button and dragging lays a run from the pressed cell to the mouse (along x, then along y; up to 200 cells; cells already taken are passed over, the pipes are drawn joined the way they will lie). *Heating - Remove pipes* is the same cursor taking a run off.
+
+Who builds:
 
 - **Players** craft the parts (crafting tab *Heating*, welding) and need a **pipe wrench** on them. Placing takes the part and a little time; taking a thing apart gives the part back. Nothing can be built or taken apart in somebody else's safehouse. Sandbox `PlayersBuild` turns this off.
 - **Radiators** are anybody's to put in and take out. **Everything else** - pipes, heat units, pump stations, water intakes, boiler houses - is built and taken apart only by the head and staff of an organization with the **Heat supply** activity. An admin ticks it in the organization window of Delirium Economy, the same way as *Road repair* of Delirium Roads. Other players see those parts greyed out in the menu with the reason. Lighting a boiler and loading fuel stay open to everyone.
 - **Admins** build for free and at once, and can fill a boiler with fuel or water.
-- *Pipe here*, or a run: *Pipe run: start here* on one cell, then *Pipe run: lay to here* on another (along x, then along y; up to 200 cells; cells already taken are passed over). The next run starts where the last one ended. *Remove pipes to here* takes a run off.
-- *Radiator here* and *Heat unit here* (at the north, west, south or east wall of the cell), *Pump station here*, *Water intake* (the clicked cell is its near corner), *Boiler house* (front to the south or to the east; the clicked cell is the middle of the front).
+
+## Windows
+
+Right-click a thing of the heating and pick its name: its window opens (the menu line itself shows the short state in a tooltip). The window is kept up to date by the server and closes when you walk away.
+
+- **Boiler house**: the state of the furnace, bars for fuel, water and water temperature (with marks at 30 and 80 degrees), whether a water intake is connected, radiators fed, fuel and water used per hour and how long the fuel lasts. *Light the furnace / Put it out*. The fuel you carry is listed by kind with what it is worth and a **Load** button each, plus **Load everything**. Admins also get *fill with fuel* and *fill with water*.
+- **Water intake**: working or without power, how many boiler houses its water reaches, its output and reach.
+- **Pump station**: working or without power, how far it sends the water, whether the boiler's and the intake's water get to it.
+- **Heat unit**: whether hot water reaches it and how hot it is, its radius, radiators in the radius.
+- **Radiator**: a heat bar, the water temperature, the air temperature at it, how far the heat spreads.
+- **Pipe**: whether the boiler's and the intake's water get here and how many cells further they would go.
+- Every window has *Take apart* (greyed out with the reason for those who may not).
 
 The objects cannot be picked up or broken with a sledgehammer.
 
@@ -58,4 +75,4 @@ The objects cannot be picked up or broken with a sledgehammer.
 | `PetrolPerLitre` | 2 | units per litre of petrol, 0 to refuse petrol |
 | `FuelTable` | `Base.Log:6; Base.Firewood:2; Base.Plank:2; ...; Base.PropaneTank:80` | item:units pairs |
 
-Tiles: pack `delheat`, `tiledef=delheat 1919`. Art is modelled from primitives and rendered with the PZ camera: `art/render_heat.py` (Blender) -> `art/cut_heat.py` (frames, item icons, `art/tiles.json`) -> `tools/TilePack/build-tilepack.ps1`. Translations are written by `art/make_translations.py`.
+Tiles: pack `delheat` (43 sprites), `tiledef=delheat 1919`. Art is modelled from primitives and rendered with the PZ camera: `art/render_heat.py` (Blender) -> `art/cut_heat.py` (frames, item icons, `art/tiles.json`) -> `tools/TilePack/build-tilepack.ps1`. Translations are written by `art/make_translations.py`.

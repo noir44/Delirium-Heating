@@ -14,6 +14,7 @@
 --   rads    = { [cell] = facing }
 --   inlets  = { [cell] = facing }
 --   pumps   = { [cell] = true | false }   has power, as last seen
+--   pumpFacing = { [cell] = "E" | "S" }   the pipe it stands along
 --
 -- An admin builds for free and anywhere; a player (sandbox PlayersBuild)
 -- needs a pipe wrench and the item, stands next to the place and gets the
@@ -37,8 +38,9 @@ local Commands = {}
 --   feeds[radiator] = { boiler anchor, ... }   load[boiler] = radiators fed
 --   supply[boiler] = working intakes that reach it
 --   heat[cell], water[cell] = cells the hot / the intake water would still go
---   inlets[cell] = true for the heat units hot water reaches
-local net = { feeds = {}, load = {}, supply = {}, heat = {}, water = {}, inlets = {} }
+--   inlets[heat unit] = { boiler anchor, ... } for those hot water reaches
+--   reached[intake] = boilers its water arrives at
+local net = { feeds = {}, load = {}, supply = {}, heat = {}, water = {}, inlets = {}, reached = {} }
 local dirty = true
 -- Radiator levels as last sent to the clients.
 local sentLevels = {}
@@ -54,7 +56,7 @@ end
 
 local function state()
 	local s = ModData.getOrCreate(DelHeat.STATE_KEY)
-	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "inlets", "pumps" }) do
+	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "inlets", "pumps", "pumpFacing" }) do
 		if type(s[name]) ~= "table" then s[name] = {} end
 	end
 	return s
@@ -97,12 +99,7 @@ local function hasPower(square)
 	return square:haveElectricity() or square:hasGridPower()
 end
 
-local function isWater(square)
-	local floor = square and square:getFloor()
-	local sprite = floor and floor:getSprite()
-	local props = sprite and sprite:getProperties()
-	return props ~= nil and props:has(IsoFlagType.water)
-end
+local isWater = DelHeat.isWater
 
 -- Cells of a structure anchored at x, y, z.
 local function structCells(x, y, z, size)
@@ -233,7 +230,7 @@ local function rebuild(s)
 	local needsPower = DelHeat.pumpNeedsPower()
 	local pumpReach = DelHeat.pumpReach()
 	local radius, floors = DelHeat.inletRadius(), DelHeat.INLET_FLOORS
-	local feeds, load, supply, heat, water, inlets = {}, {}, {}, {}, {}, {}
+	local feeds, load, supply, heat, water, inlets, reached = {}, {}, {}, {}, {}, {}, {}
 
 	local rads = {}
 	for key, _ in pairs(s.rads) do
@@ -250,7 +247,8 @@ local function rebuild(s)
 		for key, ahead in pairs(best) do
 			if (heat[key] or -1) < ahead then heat[key] = ahead end
 			if s.nodes[key] == INLET then
-				inlets[key] = true
+				if not inlets[key] then inlets[key] = {} end
+				table.insert(inlets[key], bkey)
 				local ix, iy, iz = DelHeat.unkey(key)
 				for _, rad in ipairs(rads) do
 					if not fed[rad.key] and math.abs(rad.x - ix) <= radius and math.abs(rad.y - iy) <= radius
@@ -275,13 +273,19 @@ local function rebuild(s)
 			for key, ahead in pairs(best) do
 				if (water[key] or -1) < ahead then water[key] = ahead end
 			end
+			local count = 0
 			for anchor, _ in pairs(touched) do
-				if s.boilers[anchor] then supply[anchor] = (supply[anchor] or 0) + 1 end
+				if s.boilers[anchor] then
+					supply[anchor] = (supply[anchor] or 0) + 1
+					count = count + 1
+				end
 			end
+			reached[ikey] = count
 		end
 	end
 
-	net = { feeds = feeds, load = load, supply = supply, heat = heat, water = water, inlets = inlets }
+	net = { feeds = feeds, load = load, supply = supply, heat = heat, water = water, inlets = inlets,
+		reached = reached }
 	dirty = false
 end
 
@@ -336,7 +340,11 @@ local function statusOf(s)
 	for key, intake in pairs(s.intakes) do
 		intakes[key] = intakeWorks(intake, needsPower)
 	end
-	return { boilers = boilers, pumps = pumps, intakes = intakes, inlets = n.inlets }
+	local inlets = {}
+	for key, _ in pairs(n.inlets) do
+		inlets[key] = true
+	end
+	return { boilers = boilers, pumps = pumps, intakes = intakes, inlets = inlets }
 end
 
 -- To everyone; the heat only when it changed (or forced).
@@ -387,7 +395,7 @@ local function wantedSprites(s, x, y, z)
 	-- The pipe goes on up to the cell above.
 	local above = s.nodes[DelHeat.key(x, y, z + 1)]
 	if above == PIPE or above == PUMP or above == INLET then table.insert(list, DelHeat.riserSprite()) end
-	if kind == PUMP then table.insert(list, DelHeat.pumpSprite()) end
+	if kind == PUMP then table.insert(list, DelHeat.pumpSprite(s.pumpFacing[key])) end
 	if kind == INLET then table.insert(list, DelHeat.inletSprite(s.inlets[key])) end
 	return list
 end
@@ -466,21 +474,7 @@ local function blockedSolid(s, square, x, y, z)
 	return nil
 end
 
--- Cells from (x1, y1) to (x2, y2): along x first, then along y.
-local function path(x1, y1, x2, y2, z)
-	local out = {}
-	local x, y = x1, y1
-	table.insert(out, { x = x, y = y, z = z })
-	while x ~= x2 do
-		x = x + (x2 > x and 1 or -1)
-		table.insert(out, { x = x, y = y, z = z })
-	end
-	while y ~= y2 do
-		y = y + (y2 > y and 1 or -1)
-		table.insert(out, { x = x, y = y, z = z })
-	end
-	return out
-end
+local path = DelHeat.path
 
 local function waterNear(x, y, z, size)
 	local range = DelHeat.WATER_RANGE
@@ -516,10 +510,11 @@ function Commands.place(player, args)
 		if not facing then return end
 	elseif name == "radiator" or name == "inlet" then
 		facing = oneOf(DelHeat.RADIATOR_FACINGS, args.facing) or "N"
+	elseif name == "pump" then
+		facing = oneOf(DelHeat.PUMP_FACINGS, args.facing) or "E"
 	end
 	if structure then
-		x, y = x - 1, y - 1
-		size = DelHeat.sizeOf(name == "intake" and INTAKE or BOILER, facing)
+		x, y, size = DelHeat.anchorOf(name, facing, x, y)
 		cells = structCells(x, y, z, size)
 	else
 		cells = { { x = x, y = y, z = z, dx = 0, dy = 0 } }
@@ -562,6 +557,7 @@ function Commands.place(player, args)
 		elseif name == "pump" then
 			s.nodes[ckey] = PUMP
 			s.pumps[ckey] = hasPower(getCell():getGridSquare(x, y, z))
+			s.pumpFacing[ckey] = facing
 		elseif name == "inlet" then
 			s.nodes[ckey] = INLET
 			s.inlets[ckey] = facing
@@ -711,6 +707,7 @@ function Commands.remove(player, args)
 		s.rads[ckey] = nil
 		s.inlets[ckey] = nil
 		s.pumps[ckey] = nil
+		s.pumpFacing[ckey] = nil
 	end
 	local itemType = kind and DelHeat.ITEM[DelHeat.NAME[kind] or ""]
 	if who == "player" and itemType then giveItems(player, itemType, 1) end
@@ -747,14 +744,76 @@ end
 -- Commands: anyone
 -- ---------------------------------------------------------------------------
 
--- { x, y, z }: does the water get here - the intake's and the boiler's.
-function Commands.probe(player, args)
+-- The hottest water among these boilers, or nil.
+local function hottest(s, boilers)
+	local temp
+	for _, bkey in ipairs(boilers or {}) do
+		local boiler = s.boilers[bkey]
+		local t = boiler and tonumber(boiler.temp)
+		if t and (not temp or t > temp) then temp = t end
+	end
+	return temp and math.floor(temp + 0.5) or nil
+end
+
+-- { x, y, z (any cell of the thing) }: everything its window shows.
+--   key (a structure's anchor), kind (nil when the state holds nothing there),
+--   heat, water = cells the boiler's / the intake's water would still go from
+--   a pipe, a pump or a heat unit (nil when it does not get there), and by kind:
+--   boiler:   facing, fuel, water (litres), temp, on, load, supply, by
+--   intake:   works, boilers (its water arrives at), by
+--   pump:     works
+--   inlet:    fed, temp (of the hottest water reaching it), rads (in its radius)
+--   radiator: fed (a heat unit with hot water in range), temp, level
+function Commands.info(player, args)
 	local x, y, z = coords(args)
 	if not x then return end
 	local s = state()
-	local key = DelHeat.key(x, y, z)
 	local n = network(s)
-	reply(player, "probe", { any = s.nodes[key] ~= nil, heat = n.heat[key], water = n.water[key] })
+	local key = DelHeat.key(x, y, z)
+	local kind = s.nodes[key]
+	local needsPower = DelHeat.pumpNeedsPower()
+	local out = { key = key, kind = kind }
+	if kind == BOILER or kind == INTAKE then
+		local anchor = s.cells[key]
+		out.key = anchor or key
+		local boiler = kind == BOILER and anchor and s.boilers[anchor]
+		local intake = kind == INTAKE and anchor and s.intakes[anchor]
+		if boiler then
+			out.facing = boiler.facing
+			out.fuel = round1(boiler.fuel)
+			out.litres = math.floor((tonumber(boiler.water) or 0) + 0.5)
+			out.temp = math.floor((tonumber(boiler.temp) or 0) + 0.5)
+			out.on = boiler.on == true
+			out.load = n.load[anchor] or 0
+			out.supply = n.supply[anchor] or 0
+			out.by = boiler.by
+		elseif intake then
+			out.works = intakeWorks(intake, needsPower)
+			out.boilers = n.reached[anchor] or 0
+			out.by = intake.by
+		end
+	elseif kind == RADIATOR then
+		out.fed = n.feeds[key] ~= nil
+		out.temp = hottest(s, n.feeds[key])
+		out.level = out.temp and DelHeat.heatLevel(out.temp) or 0
+	elseif kind then
+		out.heat, out.water = n.heat[key], n.water[key]
+		if kind == PUMP then
+			out.works = pumpWorks(s, key, needsPower)
+		elseif kind == INLET then
+			out.fed = n.inlets[key] ~= nil
+			out.temp = hottest(s, n.inlets[key])
+			local radius, floors, count = DelHeat.inletRadius(), DelHeat.INLET_FLOORS, 0
+			for rkey, _ in pairs(s.rads) do
+				local rx, ry, rz = DelHeat.unkey(rkey)
+				if rx and math.abs(rx - x) <= radius and math.abs(ry - y) <= radius and math.abs(rz - z) <= floors then
+					count = count + 1
+				end
+			end
+			out.rads = count
+		end
+	end
+	reply(player, "info", out)
 end
 
 -- The boiler under the cell, when the player stands near enough.

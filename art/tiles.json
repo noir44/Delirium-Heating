@@ -93,6 +93,14 @@
       }
     },
     {
+      "index": 42,
+      "png": "frames/delheat_01_42.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
       "index": 41,
       "png": "frames/delheat_01_41.png",
       "props": {}

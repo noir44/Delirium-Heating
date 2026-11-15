@@ -1,0 +1,8 @@
+name=Delirium Heating
+poster=poster.png
+pack=delheat
+tiledef=delheat 1919
+id=DelHeat
+description=District heating. A boiler house (2x3) burns wood, coal, propane or petrol and heats water; pipes laid on the ground carry it, pump stations push it further, radiators warm the rooms like a fireplace does. Placed by an admin. Build 42.
+tags=Build 42
+versionMin=42.13

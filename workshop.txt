@@ -1,0 +1,5 @@
+version=1
+title=Delirium Heating
+description=District heating: a fuel-burning boiler house, pipes, pump stations and radiators that warm the rooms. Build 42.
+tags=Build 42
+visibility=public

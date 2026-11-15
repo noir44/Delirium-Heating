@@ -1,0 +1,129 @@
+VERSION = 1,
+
+option DelHeat.FuelCapacity
+{
+	type = integer,
+	min = 1,
+	max = 100000,
+	default = 500,
+
+	page = DelHeat,
+	translation = DelHeat_FuelCapacity,
+}
+
+option DelHeat.BurnPerHour
+{
+	type = double,
+	min = 0.0,
+	max = 1000.0,
+	default = 1.0,
+
+	page = DelHeat,
+	translation = DelHeat_BurnPerHour,
+}
+
+option DelHeat.BurnPerRadiator
+{
+	type = double,
+	min = 0.0,
+	max = 100.0,
+	default = 0.05,
+
+	page = DelHeat,
+	translation = DelHeat_BurnPerRadiator,
+}
+
+option DelHeat.HeatUpPerMinute
+{
+	type = double,
+	min = 0.01,
+	max = 100.0,
+	default = 1.0,
+
+	page = DelHeat,
+	translation = DelHeat_HeatUpPerMinute,
+}
+
+option DelHeat.CoolDownPerMinute
+{
+	type = double,
+	min = 0.01,
+	max = 100.0,
+	default = 0.25,
+
+	page = DelHeat,
+	translation = DelHeat_CoolDownPerMinute,
+}
+
+option DelHeat.BoilerReach
+{
+	type = integer,
+	min = 1,
+	max = 10000,
+	default = 40,
+
+	page = DelHeat,
+	translation = DelHeat_BoilerReach,
+}
+
+option DelHeat.PumpReach
+{
+	type = integer,
+	min = 1,
+	max = 10000,
+	default = 80,
+
+	page = DelHeat,
+	translation = DelHeat_PumpReach,
+}
+
+option DelHeat.PumpNeedsPower
+{
+	type = boolean,
+	default = true,
+
+	page = DelHeat,
+	translation = DelHeat_PumpNeedsPower,
+}
+
+option DelHeat.RadiatorTemp
+{
+	type = integer,
+	min = 1,
+	max = 100,
+	default = 35,
+
+	page = DelHeat,
+	translation = DelHeat_RadiatorTemp,
+}
+
+option DelHeat.RadiatorRadius
+{
+	type = integer,
+	min = 1,
+	max = 30,
+	default = 6,
+
+	page = DelHeat,
+	translation = DelHeat_RadiatorRadius,
+}
+
+option DelHeat.PetrolPerLitre
+{
+	type = double,
+	min = 0.0,
+	max = 1000.0,
+	default = 2.0,
+
+	page = DelHeat,
+	translation = DelHeat_PetrolPerLitre,
+}
+
+option DelHeat.FuelTable
+{
+	type = string,
+	default = Base.Log:6; Base.Firewood:2; Base.Plank:2; Base.LargeBranch:1.5; Base.TreeBranch2:1; Base.UnusableWood:1; Base.Charcoal:3; Base.CharcoalCrafted:3; Base.Coke:4; Base.PropaneTank:80,
+
+	page = DelHeat,
+	translation = DelHeat_FuelTable,
+}

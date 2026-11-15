@@ -1,0 +1,212 @@
+{
+  "pack": "delheat",
+  "tileset": "delheat_01",
+  "columns": 8,
+  "rows": 8,
+  "tiles": [
+    {
+      "index": 0,
+      "png": "frames/delheat_01_0.png",
+      "props": {}
+    },
+    {
+      "index": 1,
+      "png": "frames/delheat_01_1.png",
+      "props": {}
+    },
+    {
+      "index": 2,
+      "png": "frames/delheat_01_2.png",
+      "props": {}
+    },
+    {
+      "index": 3,
+      "png": "frames/delheat_01_3.png",
+      "props": {}
+    },
+    {
+      "index": 4,
+      "png": "frames/delheat_01_4.png",
+      "props": {}
+    },
+    {
+      "index": 5,
+      "png": "frames/delheat_01_5.png",
+      "props": {}
+    },
+    {
+      "index": 6,
+      "png": "frames/delheat_01_6.png",
+      "props": {}
+    },
+    {
+      "index": 7,
+      "png": "frames/delheat_01_7.png",
+      "props": {}
+    },
+    {
+      "index": 8,
+      "png": "frames/delheat_01_8.png",
+      "props": {}
+    },
+    {
+      "index": 9,
+      "png": "frames/delheat_01_9.png",
+      "props": {}
+    },
+    {
+      "index": 10,
+      "png": "frames/delheat_01_10.png",
+      "props": {}
+    },
+    {
+      "index": 11,
+      "png": "frames/delheat_01_11.png",
+      "props": {}
+    },
+    {
+      "index": 12,
+      "png": "frames/delheat_01_12.png",
+      "props": {}
+    },
+    {
+      "index": 13,
+      "png": "frames/delheat_01_13.png",
+      "props": {}
+    },
+    {
+      "index": 14,
+      "png": "frames/delheat_01_14.png",
+      "props": {}
+    },
+    {
+      "index": 15,
+      "png": "frames/delheat_01_15.png",
+      "props": {}
+    },
+    {
+      "index": 16,
+      "png": "frames/delheat_01_16.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 18,
+      "png": "frames/delheat_01_18.png",
+      "props": {}
+    },
+    {
+      "index": 19,
+      "png": "frames/delheat_01_19.png",
+      "props": {}
+    },
+    {
+      "index": 20,
+      "png": "frames/delheat_01_20.png",
+      "props": {}
+    },
+    {
+      "index": 21,
+      "png": "frames/delheat_01_21.png",
+      "props": {}
+    },
+    {
+      "index": 22,
+      "png": "frames/delheat_01_22.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 23,
+      "png": "frames/delheat_01_23.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 24,
+      "png": "frames/delheat_01_24.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 25,
+      "png": "frames/delheat_01_25.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 26,
+      "png": "frames/delheat_01_26.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 27,
+      "png": "frames/delheat_01_27.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 28,
+      "png": "frames/delheat_01_28.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 29,
+      "png": "frames/delheat_01_29.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 30,
+      "png": "frames/delheat_01_30.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 31,
+      "png": "frames/delheat_01_31.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 32,
+      "png": "frames/delheat_01_32.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    },
+    {
+      "index": 33,
+      "png": "frames/delheat_01_33.png",
+      "props": {
+        "solidtrans": "",
+        "BlocksPlacement": ""
+      }
+    }
+  ]
+}

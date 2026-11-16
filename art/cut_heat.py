@@ -21,8 +21,10 @@ TEXTURES = os.path.join(HERE, "..", "Contents", "mods", "DeliriumHeating", "42",
 TILESET = "delheat_01"
 SCALE = 4
 # The ground under an object is a shadow catcher: its shadow is black with
-# some alpha. PZ sprites carry only a faint contact shadow.
-SHADOW = 0.45
+# some alpha. None of it goes into a frame: in the game a half-transparent
+# shadow came out as a brown blot on the floor (a radiator on dark boards,
+# 2026-11-16), and the game draws no shadows under vanilla furniture either.
+SHADOW = 0.0
 
 # Along an east-west pipe, along a north-south one.
 PUMP = {"E": 16, "S": 42}

@@ -14,10 +14,10 @@
 -- pipe of their own: their cell shows a pipe sprite (by its neighbours) and
 -- the device sprite on top of it.
 --
--- Pipes in the air: a pipe needs a floor only while it is laid. Players
--- build a floor on the level above, lay the pipes and take the floor away;
--- the pipes stay. A pipe joins the pipe right above or below it, and the
--- lower one shows a riser.
+-- Pipes in the air: above the ground a pipe needs no floor. It is laid
+-- from a floor of its level out into the air, or from the level below (the
+-- cursor lifted a level). A pipe joins the pipe right above or below it, and
+-- the lower one shows a riser.
 --
 -- Tiles: tileset delheat_01,
 --   0..15   pipe by neighbour mask (N = 1, E = 2, S = 4, W = 8),
@@ -329,6 +329,12 @@ function DelHeat.path(x1, y1, x2, y2, z)
 		table.insert(out, { x = x, y = y, z = z })
 	end
 	return out
+end
+
+-- A pipe lies on a floor on the ground and below it; higher up it hangs in
+-- the air. Everything else stands on a floor.
+function DelHeat.needsFloor(name, z)
+	return name ~= "pipe" or z <= 0
 end
 
 function DelHeat.isWater(square)

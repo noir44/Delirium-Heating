@@ -140,6 +140,18 @@ local function near(player, x, y, z, size)
 	return DelHeat.distanceTo(x, y, size or { w = 1, h = 1 }, player:getX(), player:getY()) <= DelHeat.BUILD_REACH
 end
 
+-- The square of a cell. One in the air, where nothing ever was, is made for
+-- a pipe the way vanilla makes it for a floor built upstairs
+-- (ISBuildIsoEntity:create); nil when the place is not loaded.
+local function squareAt(x, y, z, make)
+	local square = getCell():getGridSquare(x, y, z)
+	if not square and make and z > 0 and getWorld():isValidSquare(x, y, z) then
+		square = getCell():createNewGridSquare(x, y, z, true)
+		if square then square:EnsureSurroundNotNull() end
+	end
+	return square
+end
+
 -- Somebody else's safehouse.
 local function foreign(player, square)
 	return square ~= nil and SafeHouse.isSafeHouse(square, player:getUsername(), true) ~= nil
@@ -454,13 +466,12 @@ local function redrawAround(s, cells)
 	end
 end
 
--- nil when a pipe, a radiator or a heat unit may go on the square,
--- otherwise a translation key. A floor is wanted only now: a pipe laid on a
--- floor in the air stays when the floor is taken away.
-local function blockedThin(s, square, x, y, z)
+-- nil when a pipe, a radiator or a heat unit (name) may go on the square,
+-- otherwise a translation key. A pipe above the ground wants no floor.
+local function blockedThin(s, square, x, y, z, name)
 	if not square then return "IGUI_DelHeat_NotLoaded" end
 	if s.nodes[DelHeat.key(x, y, z)] then return "IGUI_DelHeat_Occupied" end
-	if not square:getFloor() then return "IGUI_DelHeat_NoFloor" end
+	if DelHeat.needsFloor(name, z) and not square:getFloor() then return "IGUI_DelHeat_NoFloor" end
 	return nil
 end
 
@@ -521,10 +532,10 @@ function Commands.place(player, args)
 	end
 
 	for _, cell in ipairs(cells) do
-		local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
+		local square = squareAt(cell.x, cell.y, cell.z, name == "pipe")
 		local why
 		if name == "pipe" or name == "radiator" or name == "inlet" then
-			why = blockedThin(s, square, cell.x, cell.y, cell.z)
+			why = blockedThin(s, square, cell.x, cell.y, cell.z, name)
 		else
 			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
 		end
@@ -585,7 +596,8 @@ local function lineOf(player, args)
 		notify(player, "IGUI_DelHeat_LineTooLong", tostring(DelHeat.MAX_LINE))
 		return nil
 	end
-	if who == "player" and not near(player, x2, y2, z) then
+	-- Either end will do: a run out into the air is laid from where it starts.
+	if who == "player" and not near(player, x2, y2, z) and not near(player, x1, y1, z) then
 		notify(player, "IGUI_DelHeat_ComeCloser")
 		return nil
 	end
@@ -603,8 +615,8 @@ function Commands.line(player, args)
 	for _, cell in ipairs(cells) do
 		local key = DelHeat.key(cell.x, cell.y, cell.z)
 		if not s.nodes[key] then
-			local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
-			local why = blockedThin(s, square, cell.x, cell.y, cell.z)
+			local square = squareAt(cell.x, cell.y, cell.z, true)
+			local why = blockedThin(s, square, cell.x, cell.y, cell.z, "pipe")
 			if not why and who == "player" and foreign(player, square) then why = "IGUI_DelHeat_Safehouse" end
 			if not why and have and #laid >= have then why = "IGUI_DelHeat_NeedItem" end
 			if why then

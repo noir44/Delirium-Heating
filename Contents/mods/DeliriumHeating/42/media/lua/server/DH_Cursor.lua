@@ -13,6 +13,10 @@
 -- the target and vanilla reports where the mouse went through rotateMouse():
 -- a device turns that way, a pipe becomes a run from the pressed square to
 -- the mouse.
+--
+-- Pipes have nothing to turn, so their rotate key lifts the cursor a level:
+-- the pipes go over the cells pointed at, laid from below. Above the ground
+-- a pipe needs no floor either way.
 
 if isServer() then return end
 
@@ -57,6 +61,14 @@ local function maskAt(x, y, z, run)
 		if joins then mask = mask + dir.bit end
 	end
 	return mask
+end
+
+-- true when the cell takes no pipe for want of a floor (the server's
+-- blockedThin): it lies on a floor on the ground and below it, higher up it
+-- hangs in the air - there the square may well not exist yet.
+local function noFloor(square, x, y, z)
+	if DelHeat.needsFloor("pipe", z) then return square == nil or square:getFloor() == nil end
+	return square == nil and not getWorld():isValidSquare(x, y, z)
 end
 
 -- nil when the cell takes the part, otherwise a translation key (the
@@ -107,6 +119,19 @@ function DH_Cursor:getSprite()
 	return self.chosenSprite
 end
 
+-- A pipe cursor has no turn: the key moves it a level up and back.
+function DH_Cursor:rotateKey(key)
+	if not self.pipes then
+		ISBuildingObject.rotateKey(self, key)
+		return
+	end
+	if not getCore():isKey(KeybindId.ROTATE_BUILDING, key) then return end
+	self.lift = 1 - self.lift
+	self.runKey = nil
+	self.character:setHaloNote(getText(self.lift > 0 and "IGUI_DelHeat_CursorLevelUp" or "IGUI_DelHeat_CursorLevelOwn"),
+		255, 255, 255, 300)
+end
+
 function DH_Cursor:rotateMouse(x, y)
 	if self.pipes then
 		self.endX, self.endY = x, y
@@ -152,10 +177,10 @@ function DH_Cursor:run(x, y, z)
 		if self.kind == "unpipe" then
 			cell.pipe = node ~= nil and node.kind == DelHeat.PIPE
 		else
-			-- A cell that holds something is passed over; one without a floor
-			-- stops the run.
+			-- A cell that holds something is passed over; one on the ground
+			-- without a floor stops the run.
 			cell.taken = node ~= nil
-			cell.bad = not cell.taken and (square == nil or square:getFloor() == nil)
+			cell.bad = not cell.taken and noFloor(square, cell.x, cell.y, cell.z)
 			cell.sprite = DelHeat.pipeSprite(maskAt(cell.x, cell.y, cell.z, run))
 		end
 	end
@@ -168,7 +193,7 @@ function DH_Cursor:why(square)
 	local key = self:rights()
 	if key then return getText(key) end
 	if not square then return getText("IGUI_DelHeat_NotLoaded") end
-	local x, y, z = square:getX(), square:getY(), square:getZ()
+	local x, y, z = square:getX(), square:getY(), square:getZ() + self.lift
 	if self.pipes then
 		local cells = self:run(x, y, z)
 		if #cells > DelHeat.MAX_LINE then
@@ -209,7 +234,11 @@ function DH_Cursor:render(x, y, z, square)
 	if not self.isLeftDown and not self.build then self.endX, self.endY = nil, nil end
 	local ok = self.canBeBuild == true
 	if self.pipes then
-		for _, cell in ipairs(self:run(x, y, z)) do
+		for _, cell in ipairs(self:run(x, y, z + self.lift)) do
+			-- Lifted: the cell pointed at is marked, the pipe is drawn over it.
+			if self.lift > 0 then
+				self:getFloorCursorSprite():RenderGhostTileColor(cell.x, cell.y, z, 1, 1, 1, 0.2)
+			end
 			if self.kind == "unpipe" then
 				if cell.pipe then
 					self:getFloorCursorSprite():RenderGhostTileColor(cell.x, cell.y, cell.z, 1, 0.3, 0.3, 0.8)
@@ -243,28 +272,29 @@ end
 -- Called by vanilla with the target square once the click is let go there.
 function DH_Cursor:create(x, y, z, north, sprite)
 	local player = self.character
-	local square = getCell():getGridSquare(x, y, z)
-	if not square then return end
+	z = z + self.lift
+	local here = { x = x, y = y, z = z }
 	if self.pipes then
 		local ex, ey = self.endX or x, self.endY or y
 		self.endX, self.endY = nil, nil
 		self.runKey = nil
 		local length = math.abs(ex - x) + math.abs(ey - y) + 1
 		if self.kind == "pipe" and length == 1 then
-			DelHeat.act(player, square, "place", { x = x, y = y, z = z, kind = "pipe" }, DelHeat.TIME.pipe)
+			DelHeat.act(player, { here }, "place", { x = x, y = y, z = z, kind = "pipe" }, DelHeat.TIME.pipe)
 			return
 		end
-		local last = getCell():getGridSquare(ex, ey, z) or square
+		-- The far end first; a run out into the air is laid from its start.
+		local ends = { { x = ex, y = ey, z = z }, here }
 		local run = { x1 = x, y1 = y, x2 = ex, y2 = ey, z = z }
 		if self.kind == "pipe" then
 			local count = self.admin and length or math.min(length, DelHeat.countOf(player, DelHeat.ITEM.pipe))
-			DelHeat.act(player, last, "line", run, math.min(1500, 60 + 40 * count))
+			DelHeat.act(player, ends, "line", run, math.min(1500, 60 + 40 * count))
 		else
-			DelHeat.act(player, last, "unline", run, math.min(1500, 60 + 30 * length))
+			DelHeat.act(player, ends, "unline", run, math.min(1500, 60 + 30 * length))
 		end
 		return
 	end
-	DelHeat.act(player, square, "place", { x = x, y = y, z = z, kind = self.kind, facing = self:facing() },
+	DelHeat.act(player, { here }, "place", { x = x, y = y, z = z, kind = self.kind, facing = self:facing() },
 		DelHeat.TIME[self.kind])
 	if not self.keep then getCell():setDrag(nil, self.player) end
 end
@@ -279,6 +309,8 @@ function DH_Cursor:new(character, kind)
 	o.player = character:getPlayerNum()
 	o.kind = kind
 	o.pipes = kind == "pipe" or kind == "unpipe"
+	-- Levels above the one pointed at (pipes only, the rotate key).
+	o.lift = 0
 	o.solid = kind == "pump" or kind == "boiler" or kind == "intake"
 	-- Pipes and radiators go down one after another; the cursor stays.
 	o.keep = o.pipes or kind == "radiator"

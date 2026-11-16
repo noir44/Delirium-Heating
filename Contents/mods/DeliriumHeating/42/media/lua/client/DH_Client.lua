@@ -258,23 +258,34 @@ DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 50
 -- The parts in the order the menu shows them.
 DelHeat.PARTS = { "pipe", "radiator", "inlet", "pump", "intake", "boiler" }
 
-function DelHeat.act(player, square, command, args, time)
+-- cells: where the work is ({ x, y, z }), best first - the cell built on,
+-- or the two ends of a run.
+function DelHeat.act(player, cells, command, args, time)
 	if DelHeat.isAdmin(player) then
 		DelHeat.send(command, args)
 		return
 	end
-	-- A pipe in the air has no floor to walk up to: it is worked on from
-	-- below, from where the player stands.
-	if square:getZ() ~= math.floor(player:getZ()) or not square:getFloor() then
-		local dx, dy = square:getX() + 0.5 - player:getX(), square:getY() + 0.5 - player:getY()
-		if dx * dx + dy * dy > DelHeat.BUILD_REACH * DelHeat.BUILD_REACH then
-			player:setHaloNote(getText("IGUI_DelHeat_ComeCloser"), 255, 255, 255, 300)
+	local pz = math.floor(player:getZ())
+	-- A floor to walk up to: the cell itself, or the one right under (over)
+	-- a pipe of the next level.
+	for _, cell in ipairs(cells) do
+		if math.abs(cell.z - pz) <= 1 then
+			local stand = getCell():getGridSquare(cell.x, cell.y, pz)
+			if stand and stand:getFloor() and not DelHeat.isWater(stand) and luautils.walkAdj(player, stand, true) then
+				ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time, cell))
+				return
+			end
+		end
+	end
+	-- Nothing to walk on (a pipe out in the air): from where the player stands.
+	for _, cell in ipairs(cells) do
+		local dx, dy = cell.x + 0.5 - player:getX(), cell.y + 0.5 - player:getY()
+		if math.abs(cell.z - pz) <= 1 and dx * dx + dy * dy <= DelHeat.BUILD_REACH * DelHeat.BUILD_REACH then
+			ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time, cell))
 			return
 		end
-		ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time))
-	elseif luautils.walkAdj(player, square, true) then
-		ISTimedActionQueue.add(DH_BuildAction:new(player, command, args, time))
 	end
+	player:setHaloNote(getText("IGUI_DelHeat_ComeCloser"), 255, 255, 255, 300)
 end
 
 -- nil when this player may take the part apart, otherwise a translation

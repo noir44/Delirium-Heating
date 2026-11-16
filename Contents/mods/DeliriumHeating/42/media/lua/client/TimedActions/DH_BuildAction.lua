@@ -9,11 +9,10 @@ require "DH_Shared"
 
 DH_BuildAction = ISBaseTimedAction:derive("DH_BuildAction")
 
--- The cell worked on: the end of a run or the placed cell.
+-- The cell worked at: the placed one, or the end of a run the player
+-- stands by.
 function DH_BuildAction:target()
-	local x = self.args.x2 or self.args.x
-	local y = self.args.y2 or self.args.y
-	return x + 0.5, y + 0.5
+	return self.spot.x + 0.5, self.spot.y + 0.5
 end
 
 function DH_BuildAction:isValid()
@@ -52,10 +51,11 @@ function DH_BuildAction:getDuration()
 	return self.time
 end
 
-function DH_BuildAction:new(character, command, args, time)
+function DH_BuildAction:new(character, command, args, time, spot)
 	local o = ISBaseTimedAction.new(self, character)
 	o.command = command
 	o.args = args
+	o.spot = spot
 	o.time = math.max(1, math.floor(tonumber(time) or 200))
 	o.maxTime = o:getDuration()
 	return o

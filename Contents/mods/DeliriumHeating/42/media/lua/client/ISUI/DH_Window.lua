@@ -419,7 +419,8 @@ end
 
 function DH_Window:onRemove()
 	local name = DelHeat.NAME[self.node.kind]
-	DelHeat.act(self.player, self.square, "remove", self:coords(), DelHeat.TIME[name] or 200)
+	local at = self:coords()
+	DelHeat.act(self.player, { { x = at.x, y = at.y, z = at.z } }, "remove", at, DelHeat.TIME[name] or 200)
 	self:close()
 end
 

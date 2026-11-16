@@ -1,5 +1,5 @@
 {
-	"Tooltip_DelHeat_Pipe": "Lies on the ground and carries the water. Laid one by one, or as a run: hold the button and drag. To cross a road in the air: build a floor one level up, lay the pipes on it and take the floor away. Built only by the staff of a heat supply organization. Right-click it: Place. A pipe wrench is needed.",
+	"Tooltip_DelHeat_Pipe": "Lies on the ground and carries the water. Laid one by one, or as a run: hold the button and drag. Above the ground it needs no floor: lay it out into the air from an upper floor, or press R and lay it a level up from the ground. Built only by the staff of a heat supply organization. Right-click it: Place. A pipe wrench is needed.",
 	"Tooltip_DelHeat_Radiator": "Warms a room when a heat unit with hot water is within range. Needs no pipe of its own. Right-click it: Place. A pipe wrench is needed.",
 	"Tooltip_DelHeat_Inlet": "Stands at a wall of a house on the end of a pipe and feeds the radiators around it. Built only by the staff of a heat supply organization. Right-click it: Place. A pipe wrench is needed.",
 	"Tooltip_DelHeat_Pump": "Sends the water further along the pipe. Turned along the pipe it stands on. Needs electricity. Built only by the staff of a heat supply organization. Right-click it: Place. A pipe wrench is needed.",

@@ -334,6 +334,8 @@ function DH_Window:refresh()
 		y = self:inlet(d, y)
 	elseif kind == DelHeat.RADIATOR then
 		y = self:radiator(d, y)
+	elseif kind == DelHeat.SUPPORT then
+		y = self:addLine(y, getText("IGUI_DelHeat_SupportInfo"), GREY)
 	else
 		y = self:reachLines(d, y)
 	end

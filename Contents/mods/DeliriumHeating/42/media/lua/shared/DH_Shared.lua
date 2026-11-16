@@ -27,8 +27,16 @@
 --   22..27  boiler with its front to the south, 3 wide x 2 deep (dy * 3 + dx),
 --   28..33  boiler with its front to the east, 2 wide x 3 deep (dy * 2 + dx),
 --   34..37  water intake, 2 x 2 (dy * 2 + dx),
---   41      riser: the pipe going up to the cell above;
+--   41      riser: the pipe going up to the cell above,
+--   43      pipe support: a steel lattice post one level high, only for the look;
 -- (dx, dy) counted from the structure's north-west cell, its anchor.
+--
+-- Where things join. A pipe and a heat unit take a pipe on all four sides.
+-- A pump takes one only along its axis: its sprite carries its own length of
+-- pipe, there is no pipe sprite under it. A boiler and an intake take pipes
+-- only at their outlets (PORTS below, where the sprite shows a pipe end). A
+-- pipe lying next to any other cell of them does not join, neither on the
+-- picture nor for the water.
 --
 -- Who builds: an admin anything; any player the radiators; the head and
 -- staff of an organization with the heat supply activity (Delirium Economy)
@@ -43,13 +51,15 @@ DelHeat.TILESET = "delheat_01_"
 
 DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET = "p", "u", "i"
 DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE = "r", "b", "w"
+DelHeat.SUPPORT = "s"
 
 -- Kind -> the name the commands, the items and the translations use.
-DelHeat.NAME = { p = "pipe", u = "pump", i = "inlet", r = "radiator", b = "boiler", w = "intake" }
+DelHeat.NAME = { p = "pipe", u = "pump", i = "inlet", r = "radiator", b = "boiler", w = "intake", s = "support" }
 -- What a player builds each of, and gets back when it is taken apart.
 DelHeat.ITEM = {
 	pipe = "DelHeat.Pipe", pump = "DelHeat.Pump", inlet = "DelHeat.Inlet",
 	radiator = "DelHeat.Radiator", boiler = "DelHeat.Boiler", intake = "DelHeat.Intake",
+	support = "DelHeat.Support",
 }
 -- The tool a player needs on them to build or take apart.
 DelHeat.TOOL = "Base.PipeWrench"
@@ -67,19 +77,53 @@ DelHeat.SPRITE_RISER = 41
 DelHeat.SPRITE_RADIATOR = { N = 18, W = 19, S = 20, E = 21 }
 DelHeat.SPRITE_BOILER = { S = 22, E = 28 }
 DelHeat.SPRITE_INTAKE = 34
+DelHeat.SPRITE_SUPPORT = 43
 -- The four edges of a cell a radiator or a heat unit stands at.
 DelHeat.RADIATOR_FACINGS = { "N", "W", "S", "E" }
 DelHeat.BOILER_FACINGS = { "S", "E" }
 DelHeat.BOILER_SIZE = { S = { w = 3, h = 2 }, E = { w = 2, h = 3 } }
 DelHeat.INTAKE_SIZE = { w = 2, h = 2 }
 
--- Neighbours in the plane, with their bit in a pipe's sprite mask.
+-- Neighbours in the plane, with their bit in a pipe's sprite mask and the
+-- bit of the side that faces back.
 DelHeat.DIRS = {
-	{ dx = 0, dy = -1, bit = 1 },
-	{ dx = 1, dy = 0, bit = 2 },
-	{ dx = 0, dy = 1, bit = 4 },
-	{ dx = -1, dy = 0, bit = 8 },
+	{ dx = 0, dy = -1, bit = 1, back = 4 },
+	{ dx = 1, dy = 0, bit = 2, back = 8 },
+	{ dx = 0, dy = 1, bit = 4, back = 1 },
+	{ dx = -1, dy = 0, bit = 8, back = 2 },
 }
+
+-- The sides (a mask of the same bits) a thing takes a pipe on.
+DelHeat.ALL_SIDES = 15
+DelHeat.PUMP_SIDES = { E = 2 + 8, S = 1 + 4 }
+-- Outlets of the structures by cell ("dx,dy" from the anchor): the boiler's
+-- two at its tank, the intake's discharge out of the south face of its pad.
+DelHeat.BOILER_PORTS = { S = { ["2,1"] = 2 + 4 }, E = { ["1,0"] = 1 + 2 } }
+DelHeat.INTAKE_PORTS = { ["1,1"] = 4 }
+
+-- Kahlua has no bit operators.
+function DelHeat.hasSide(mask, bit)
+	return math.floor((mask or 0) / bit) % 2 == 1
+end
+
+-- kind, and for a pump or a boiler its facing, for a boiler or an intake the
+-- cell (dx, dy from the anchor).
+function DelHeat.sidesOf(kind, facing, dx, dy)
+	if kind == DelHeat.PIPE or kind == DelHeat.INLET then return DelHeat.ALL_SIDES end
+	if kind == DelHeat.PUMP then return DelHeat.PUMP_SIDES[facing] or DelHeat.PUMP_SIDES.E end
+	if kind == DelHeat.BOILER then
+		local ports = DelHeat.BOILER_PORTS[facing] or DelHeat.BOILER_PORTS.S
+		return ports[tostring(dx) .. "," .. tostring(dy)] or 0
+	end
+	if kind == DelHeat.INTAKE then return DelHeat.INTAKE_PORTS[tostring(dx) .. "," .. tostring(dy)] or 0 end
+	return 0
+end
+
+-- The same for what nodeAt() read off the square at (x, y).
+function DelHeat.sidesOfNode(node, x, y)
+	if not node then return 0 end
+	return DelHeat.sidesOf(node.kind, node.facing, x - node.x, y - node.y)
+end
 
 -- Water temperature, Celsius: radiators start to warm at WARM and give
 -- their full heat at HOT; the boiler stops at MAX.
@@ -240,6 +284,10 @@ function DelHeat.inletSprite(facing)
 	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_INLET[facing] or DelHeat.SPRITE_INLET.N)
 end
 
+function DelHeat.supportSprite()
+	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_SUPPORT)
+end
+
 function DelHeat.riserSprite()
 	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_RISER)
 end
@@ -264,6 +312,7 @@ function DelHeat.parseSprite(name)
 	local index = tonumber(string.sub(name, #DelHeat.TILESET + 1))
 	if not index or index < 0 then return nil end
 	if index <= 15 or index == DelHeat.SPRITE_RISER then return { kind = DelHeat.PIPE, pipe = true } end
+	if index == DelHeat.SPRITE_SUPPORT then return { kind = DelHeat.SUPPORT } end
 	for facing, sprite in pairs(DelHeat.SPRITE_PUMP) do
 		if index == sprite then return { kind = DelHeat.PUMP, facing = facing } end
 	end

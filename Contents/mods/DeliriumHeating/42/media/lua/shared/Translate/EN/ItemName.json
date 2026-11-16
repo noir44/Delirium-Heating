@@ -1,6 +1,7 @@
 {
 	"DelHeat.Pipe": "Heating Pipe",
 	"DelHeat.Radiator": "Radiator",
+	"DelHeat.Support": "Pipe Support",
 	"DelHeat.Inlet": "Heat Unit",
 	"DelHeat.Pump": "Pump Station",
 	"DelHeat.Intake": "Water Intake Kit",

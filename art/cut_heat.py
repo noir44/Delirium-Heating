@@ -30,6 +30,7 @@ SHADOW = 0.0
 PUMP = {"E": 16, "S": 42}
 INLET = {"N": 17, "W": 38, "S": 39, "E": 40}
 RISER = 41
+SUPPORT = 43
 # One level up is 192 px at 2x.
 LEVEL = 192
 RADIATOR = {"N": 18, "W": 19, "S": 20, "E": 21}
@@ -140,11 +141,14 @@ def scene():
     for (x, y, z) in nodes:
         mask = sum(bit for bit, (dx, dy) in ((1, (0, -1)), (2, (1, 0)), (4, (0, 1)), (8, (-1, 0)))
                    if (x + dx, y + dy, z) in nodes)
-        put(x, y, z, mask)
+        # A pump carries its own length of pipe.
+        if devices.get((x, y, z)) not in PUMP.values():
+            put(x, y, z, mask)
         if (x, y, z + 1) in nodes:
             put(x, y, z, RISER)
         if (x, y, z) in devices:
             put(x, y, z, devices[(x, y, z)])
+    put(0, 7, 0, SUPPORT)
     put(5, 7, 0, RADIATOR["N"])
     put(8, 6, 0, RADIATOR["E"])
     put(4, 5, 0, RADIATOR["W"])
@@ -181,6 +185,7 @@ def tiles_json():
     for index in PUMP.values():
         add(index, SOLID)
     add(RISER)
+    add(SUPPORT)
     for index in list(RADIATOR.values()) + list(INLET.values()):
         add(index)
     for first, wide, deep in STRUCTURES.values():
@@ -198,6 +203,7 @@ def main():
     single("pump", PUMP["E"])
     single("pump_S", PUMP["S"])
     single("riser", RISER)
+    single("support", SUPPORT)
     for facing, index in RADIATOR.items():
         single("radiator_" + facing, index)
     for facing, index in INLET.items():
@@ -208,6 +214,7 @@ def main():
 
     icon(frame(10), "Pipe")
     icon(frame(RADIATOR["N"]), "Radiator")
+    icon(frame(SUPPORT), "Support")
     icon(frame(INLET["N"]), "Inlet")
     icon(frame(PUMP["E"]), "Pump")
     icon(assemble("intake"), "Intake")

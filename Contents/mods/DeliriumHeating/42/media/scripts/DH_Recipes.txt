@@ -28,6 +28,26 @@ module DelHeat
 		}
 	}
 
+	craftRecipe MakePipeSupport
+	{
+		timedAction = Welding,
+		time = 200,
+		SkillRequired = MetalWelding:2,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:10,
+		inputs
+		{
+			item 4 [Base.MetalBar],
+			item 1 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.Support,
+		}
+	}
+
 	craftRecipe MakeHeatingRadiator
 	{
 		timedAction = Welding,

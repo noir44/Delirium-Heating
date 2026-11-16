@@ -5,6 +5,8 @@
 	"IGUI_DelHeat_Kind_radiator": "Радіатор",
 	"IGUI_DelHeat_Kind_boiler": "Котельня",
 	"IGUI_DelHeat_Kind_intake": "Водозабір",
+	"IGUI_DelHeat_Kind_support": "Опора труби",
+	"IGUI_DelHeat_SupportInfo": "Сталева опора під трубу, прокладену поверхом вище. Лише для вигляду: труба висить і без неї.",
 	"IGUI_DelHeat_NoData": "Дані з сервера ще не надійшли",
 	"IGUI_DelHeat_Burning": "Топка горить",
 	"IGUI_DelHeat_OutOfFuel": "Розпалена, але паливо скінчилося",

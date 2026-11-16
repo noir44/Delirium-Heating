@@ -5,6 +5,8 @@
 	"IGUI_DelHeat_Kind_radiator": "Radiator",
 	"IGUI_DelHeat_Kind_boiler": "Boiler house",
 	"IGUI_DelHeat_Kind_intake": "Water intake",
+	"IGUI_DelHeat_Kind_support": "Pipe support",
+	"IGUI_DelHeat_SupportInfo": "A steel post under a pipe laid a level up. Only for the look: the pipe hangs without it too.",
 	"IGUI_DelHeat_NoData": "No data from the server yet",
 	"IGUI_DelHeat_Burning": "The furnace is burning",
 	"IGUI_DelHeat_OutOfFuel": "Lit, but out of fuel",

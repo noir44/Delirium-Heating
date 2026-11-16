@@ -55,8 +55,10 @@ local function maskAt(x, y, z, run)
 		local nx, ny = x + dir.dx, y + dir.dy
 		local joins = run[DelHeat.key(nx, ny, z)] == true
 		if not joins then
+			-- Only a neighbour that takes a pipe from this side: a pump along
+			-- its axis, a boiler or an intake at an outlet.
 			local node = DelHeat.nodeAt(getCell():getGridSquare(nx, ny, z))
-			joins = node ~= nil and node.kind ~= DelHeat.RADIATOR
+			joins = DelHeat.hasSide(DelHeat.sidesOfNode(node, nx, ny), dir.back)
 		end
 		if joins then mask = mask + dir.bit end
 	end
@@ -110,6 +112,7 @@ function DH_Cursor:spriteAt(facing, dx, dy)
 	if kind == "pump" then return DelHeat.pumpSprite(facing) end
 	if kind == "boiler" then return DelHeat.boilerSprite(facing, dx, dy) end
 	if kind == "intake" then return DelHeat.intakeSprite(dx, dy) end
+	if kind == "support" then return DelHeat.supportSprite() end
 	return DelHeat.pipeSprite(0)
 end
 
@@ -313,7 +316,7 @@ function DH_Cursor:new(character, kind)
 	o.lift = 0
 	o.solid = kind == "pump" or kind == "boiler" or kind == "intake"
 	-- Pipes and radiators go down one after another; the cursor stays.
-	o.keep = o.pipes or kind == "radiator"
+	o.keep = o.pipes or kind == "radiator" or kind == "support"
 	o.noNeedHammer = true
 	o.skipBuildAction = true
 	-- A pump along an east-west pipe; the rest to the north / front to the south.
@@ -330,7 +333,7 @@ function DH_Cursor.start(player, kind)
 		hint = "IGUI_DelHeat_CursorHintPipe"
 	elseif kind == "unpipe" then
 		hint = "IGUI_DelHeat_CursorHintUnpipe"
-	elseif kind == "intake" then
+	elseif kind == "intake" or kind == "support" then
 		hint = "IGUI_DelHeat_CursorHintPlain"
 	end
 	player:setHaloNote(getText(hint), 255, 255, 255, 400)

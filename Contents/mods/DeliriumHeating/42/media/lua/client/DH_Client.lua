@@ -254,9 +254,9 @@ end
 -- the item and the distance again).
 -- ---------------------------------------------------------------------------
 
-DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800 }
+DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800, support = 150 }
 -- The parts in the order the menu shows them.
-DelHeat.PARTS = { "pipe", "radiator", "inlet", "pump", "intake", "boiler" }
+DelHeat.PARTS = { "pipe", "support", "radiator", "inlet", "pump", "intake", "boiler" }
 
 -- cells: where the work is ({ x, y, z }), best first - the cell built on,
 -- or the two ends of a run.

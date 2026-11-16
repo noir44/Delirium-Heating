@@ -1,6 +1,6 @@
 # Models and renders every Delirium Heating sprite with the PZ camera:
-# 16 pipes (by neighbour mask), the riser, 2 pumps, 4 heat units, 4 radiators,
-# 2 boiler houses, the water intake.
+# 16 pipes (by neighbour mask), the riser, the pipe support, 2 pumps, 4 heat
+# units, 4 radiators, 2 boiler houses, the water intake.
 #   blender --background --factory-startup --python render_heat.py -- <out_dir> [name ...]
 # Writes <out_dir>/<name>_color.png (4x) and, for the boilers, <name>_mask.png
 # (which cell every pixel stands on); cut_heat.py turns them into the frames.
@@ -8,14 +8,17 @@
 # Same PZ camera as Delirium-Mines/art/render_rock.py: ortho, elevation 30,
 # azimuth 45, 90.51 px per unit at 2x. Blender x = PZ x (east), -y = PZ y
 # (south), one unit is one cell; the anchor cell is x 0..1, y -1..0.
-# Everything is built from primitives here: no models, no textures.
-import bpy, sys, math, os
+# Built from primitives here, except the pump and the water intake: those
+# are Meshy models (art/meshy/*.glb, image-to-3D from the concept pictures in
+# art/meshy/src) fitted to the cell, with the pipe ends added to them.
+import bpy, bmesh, sys, math, os
 from mathutils import Vector, Euler, Matrix
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 OUT = os.path.abspath(argv[0])
 ONLY = argv[1:]
 os.makedirs(OUT, exist_ok=True)
+MESHY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meshy")
 
 SCALE = 4
 PX_PER_UNIT = 128 / math.sqrt(2)
@@ -166,6 +169,44 @@ def transform(matrix):
         obj.matrix_world = matrix @ obj.matrix_world
 
 
+def load_model(name):
+    # A Meshy GLB as one mesh object, its vertices in world space.
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.join(MESHY, name + ".glb"))
+    bpy.context.view_layer.update()
+    obj = [o for o in bpy.data.objects if o not in before and o.type == "MESH"][0]
+    world = obj.matrix_world.copy()
+    obj.parent = None
+    obj.matrix_world = Matrix.Identity(4)
+    obj.data.transform(world)
+    for poly in obj.data.polygons:
+        poly.use_smooth = True
+    made.append(obj)
+    return obj
+
+
+def bounds(obj, keep=None):
+    pts = [v.co for v in obj.data.vertices if keep is None or keep(v.co)]
+    lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+    hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    return lo, hi
+
+
+def cut(obj, point, normal):
+    # Throws away what the model has behind the plane (world space): the
+    # side the normal points away from.
+    bpy.context.view_layer.update()
+    world = obj.matrix_world
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    co = world.inverted() @ Vector(point)
+    no = (world.to_3x3().transposed() @ Vector(normal)).normalized()
+    bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no,
+                           clear_inner=True)
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
 def turn_about(centre, degrees):
     c = Vector(centre)
     return Matrix.Translation(c) @ Matrix.Rotation(math.radians(degrees), 4, "Z") @ Matrix.Translation(-c)
@@ -226,28 +267,32 @@ def build_radiator(degrees):
 
 
 def build_pump(degrees):
+    # The Meshy pump: an in-line pump on its own length of pipe, which runs
+    # along x in the model. Most of the bare pipe at its ends is cut off, the
+    # rest fitted into the cell with the pipe's axis where the network's
+    # pipes lie (the model sinks a little: its concrete block becomes a low
+    # slab), a little thicker across than along so its pipe comes nearer the
+    # network's, and a flanged end of a network pipe added on each side.
     # Along the east-west pipe; turned for a north-south one.
-    y, z = -0.5, 0.30
-    box(0.16, 0.84, -0.70, -0.30, 0.0, 0.09, M["concrete"])
-    # Motor with cooling fins.
-    cyl((0.20, y, z), (0.55, y, z), 0.15, M["blue"])
-    for i in range(6):
-        x = 0.24 + i * 0.05
-        cyl((x, y, z), (x + 0.015, y, z), 0.165, M["blue"], 32)
-    cyl((0.17, y, z), (0.20, y, z), 0.11, M["dark"])
-    box(0.30, 0.44, y - 0.07, y + 0.07, z + 0.13, z + 0.21, M["dark"])
-    for x in (0.25, 0.50):
-        box(x - 0.03, x + 0.03, y - 0.13, y + 0.13, 0.09, z - 0.08, M["dark"])
-    # Coupling and the pump casing.
-    cyl((0.55, y, z), (0.62, y, z), 0.06, M["steel"], 20)
-    cyl((0.62, y, z), (0.75, y, z), 0.20, M["red"])
-    cyl((0.75, y, z), (0.80, y, z), 0.10, M["red"])
-    box(0.63, 0.74, y - 0.12, y + 0.12, 0.09, z - 0.12, M["dark"])
-    # Suction from the pipe below, discharge back down to it.
-    cyl((0.80, y, z), (0.86, y, z), 0.075, M["steel"], 20)
-    cyl((0.86, y, z), (0.88, y, z), 0.105, M["dark"], 20)
-    cyl((0.685, y, z + 0.18), (0.685, y, z + 0.30), 0.07, M["steel"], 20)
-    cyl((0.685, y, z + 0.30), (0.685, y, z + 0.32), 0.10, M["dark"], 20)
+    obj = load_model("pump")
+    lo, hi = bounds(obj)
+    length = hi.x - lo.x
+    # The bare end of the pipe gives its axis and its radius.
+    elo, ehi = bounds(obj, lambda co: co.x > hi.x - length * 0.04)
+    axis_y, axis_z = (elo.y + ehi.y) / 2, (elo.z + ehi.z) / 2
+    left, right = lo.x + length * 0.03, lo.x + length * 0.85
+    cut(obj, (left, 0, 0), (1, 0, 0))
+    cut(obj, (right, 0, 0), (-1, 0, 0))
+    k, fat = 0.84 / (right - left), 1.2
+    print("PUMP pipe radius in the cell:", round((ehi.z - elo.z) / 2 * k * fat, 4), "height",
+          round((hi.z - axis_z) * k * fat + Z_PIPE, 3))
+    obj.matrix_world = (Matrix.Translation(Vector((0.5, -0.5, Z_PIPE))) @ Matrix.Diagonal(Vector((k, k * fat, k * fat, 1)))
+                        @ Matrix.Translation(Vector((-(left + right) / 2, -axis_y, -axis_z))))
+    cut(obj, (0, 0, 0), (0, 0, 1))
+    y = -0.5
+    for edge, inward in ((0.0, 1), (1.0, -1)):
+        cyl((edge - inward * OVERLAP, y, Z_PIPE), (edge + inward * 0.10, y, Z_PIPE), R_PIPE, M["steel"])
+        cyl((edge + inward * 0.07, y, Z_PIPE), (edge + inward * 0.105, y, Z_PIPE), R_PIPE * 1.25, M["dark"])
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
@@ -285,47 +330,43 @@ def build_riser():
     ball(CENTRE, R_PIPE * 1.25, M["dark"])
 
 
+def build_support():
+    # Pipe support: a steel lattice post one level high, its top plate right
+    # under a pipe laid a level up.
+    cx, cy = 0.5, -0.5
+    top = LEVEL + Z_PIPE - R_PIPE
+    half, leg = 0.13, 0.022
+    box(cx - 0.21, cx + 0.21, cy - 0.21, cy + 0.21, 0.0, 0.07, M["concrete"])
+    corners = [(cx - half, cy - half), (cx + half, cy - half), (cx + half, cy + half), (cx - half, cy + half)]
+    for x, y in corners:
+        box(x - leg, x + leg, y - leg, y + leg, 0.07, top - 0.04, M["steel"])
+    levels = [0.12 + i * (top - 0.20) / 4 for i in range(5)]
+    for i, z in enumerate(levels):
+        for j in range(4):
+            a, b = corners[j], corners[(j + 1) % 4]
+            cyl((a[0], a[1], z), (b[0], b[1], z), 0.016, M["steel"], 8)
+            if i < len(levels) - 1:
+                # Braces zigzag up each face.
+                lower, upper = (a, b) if (i + j) % 2 == 0 else (b, a)
+                cyl((lower[0], lower[1], z), (upper[0], upper[1], levels[i + 1]), 0.012, M["dark"], 8)
+    box(cx - 0.19, cx + 0.19, cy - 0.19, cy + 0.19, top - 0.04, top, M["dark"])
+
+
 def build_intake():
-    # Water intake, x 0..2, y -2..0: a well with a hatch, the standpipe out
-    # of it, the pump with its motor, the control cabinet, the discharge.
-    box(0.05, 1.95, -1.95, -0.05, 0.0, 0.10, M["concrete"])
-    wx, wy = 0.62, -0.62
-    cyl((wx, wy, 0.10), (wx, wy, 0.60), 0.44, M["concrete"], 48)
-    cyl((wx, wy, 0.60), (wx, wy, 0.64), 0.38, M["dark"], 48)
-    box(wx - 0.16, wx + 0.16, wy - 0.42, wy - 0.36, 0.60, 0.66, M["steel"])
-    py, pz = -1.38, 0.50
-    cyl((wx, wy, 0.64), (wx, wy, 1.02), 0.085, M["steel"], 24)
-    ball((wx, wy, 1.02), 0.085, M["steel"])
-    cyl((wx, wy, 1.02), (wx, py, 1.02), 0.085, M["steel"], 24)
-    ball((wx, py, 1.02), 0.085, M["steel"])
-    cyl((wx, py, 1.02), (wx, py, pz), 0.085, M["steel"], 24)
-    cyl((wx, wy, 0.84), (wx, wy, 0.88), 0.12, M["dark"], 24)
-    # Pump casing, coupling, motor with fins.
-    box(0.40, 1.62, py - 0.27, py + 0.27, 0.10, 0.20, M["dark"])
-    cyl((0.50, py, pz), (0.74, py, pz), 0.30, M["red"], 48)
-    cyl((0.74, py, pz), (0.84, py, pz), 0.09, M["steel"], 20)
-    cyl((0.84, py, pz), (1.50, py, pz), 0.23, M["blue"], 48)
-    for i in range(9):
-        x = 0.90 + i * 0.065
-        cyl((x, py, pz), (x + 0.02, py, pz), 0.25, M["blue"], 48)
-    cyl((1.50, py, pz), (1.56, py, pz), 0.17, M["dark"], 32)
-    box(1.05, 1.27, py - 0.09, py + 0.09, pz + 0.21, pz + 0.31, M["dark"])
-    # Discharge: out of the casing, down, and along the slab to the south.
-    cyl((0.50, py, pz), (0.28, py, pz), 0.085, M["steel"], 24)
-    cyl((0.44, py, pz), (0.47, py, pz), 0.13, M["dark"], 24)
-    ball((0.28, py, pz), 0.085, M["steel"])
-    cyl((0.28, py, pz), (0.28, py, 0.10 + R_PIPE), 0.085, M["steel"], 24)
-    ball((0.28, py, 0.10 + R_PIPE), 0.085, M["steel"])
-    cyl((0.28, py, 0.10 + R_PIPE), (0.28, -1.95, 0.10 + R_PIPE), R_PIPE, M["steel"])
-    # Control cabinet on a stand, behind on the right.
-    for x in (1.44, 1.70):
-        box(x - 0.025, x + 0.025, -0.52, -0.47, 0.10, 0.50, M["dark"])
-    box(1.36, 1.78, -0.58, -0.40, 0.50, 1.12, M["green"])
-    box(1.39, 1.75, -0.595, -0.58, 0.54, 1.08, M["steel"])
-    cyl((1.48, -0.61, 0.96), (1.48, -0.595, 0.96), 0.05, M["white"], 24)
-    cyl((1.66, -0.61, 0.96), (1.66, -0.595, 0.96), 0.03, M["red"], 16)
-    cyl((1.57, -0.49, 0.50), (1.57, -0.49, 0.16), 0.03, M["dark"], 12)
-    cyl((1.57, -0.49, 0.16), (1.57, -1.11, 0.16), 0.03, M["dark"], 12)
+    # The Meshy water intake, x 0..2, y -2..0: a concrete pad with the pump
+    # and its motor, a gate valve, a switch box on a post, a pipe railing.
+    # Its discharge goes down into the pad at the south-east; the outlet the
+    # network joins comes out of the pad's south face there: the middle of
+    # the south side of the cell (1, 1).
+    obj = load_model("intake")
+    lo, hi = bounds(obj)
+    k = 1.90 / (hi.x - lo.x)
+    obj.matrix_world = (Matrix.Translation(Vector((1.0, -1.0, 0.0))) @ Matrix.Scale(k, 4)
+                        @ Matrix.Translation(Vector((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z))))
+    south = -1.0 - (hi.y - lo.y) / 2 * k
+    print("INTAKE pad south face at y =", round(south, 3), "height", round((hi.z - lo.z) * k, 3))
+    cyl((1.5, south + 0.06, Z_PIPE), (1.5, -2.0, Z_PIPE), R_PIPE, M["steel"])
+    cyl((1.5, south - 0.01, Z_PIPE), (1.5, south - 0.05, Z_PIPE), R_PIPE * 1.25, M["dark"])
 
 
 def build_boiler(facing):
@@ -541,6 +582,7 @@ for mask in range(16):
 shoot("pump", lambda: build_pump(0), 256, 96)
 shoot("pump_S", lambda: build_pump(270), 256, 96)
 shoot("riser", build_riser, 256, 96)
+shoot("support", build_support, 256, 96)
 for facing, degrees in (("N", 0), ("W", 90), ("S", 180), ("E", 270)):
     shoot("radiator_" + facing, lambda: build_radiator(degrees), 256, 96)
     shoot("inlet_" + facing, lambda: build_inlet(degrees), 256, 96)

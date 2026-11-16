@@ -11,6 +11,8 @@ District heating for a world without grid power: one boiler house heats a whole 
 - **Pump stations**: the water travels 60 cells of pipe from an intake and 40 from a boiler house; a pump station on the way sends it 80 cells further. A pump needs electricity (a generator in range); without it it is just a pipe. It is turned along the pipe it stands on, east-west or north-south.
 - **Heat unit**: stands at a wall of a house (any of the four edges of its cell) on the end of a pipe. When hot water reaches it, every radiator within 10 cells of it works (three floors up and down; the radius is the sandbox option `InletRadius`) - no pipes inside the house.
 - **Radiators** stand in the rooms, at any of the four walls. A working one warms the air around it the way a vanilla fireplace does (an `IsoHeatSource`): walls and closed doors stop the heat. They start to warm at 30 degrees of water and give full heat at 80.
+- **Where things join.** A pipe joins the pipes around it on all four sides. A **pump station** carries its own length of pipe and joins only at its two ends: it is put into a line, turned along it; a pump turned across a line cuts it. A **boiler house** takes pipes only at the two pipe ends by its tank (on the corner cell: to the east and to the south with the front to the south; to the north and to the east with the front to the east). A **water intake** takes one at the pipe end coming out of the south face of its pad, on its south-east cell. A pipe lying against any other cell of them joins nothing, neither on the picture nor for the water.
+- **Pipe support**: a steel lattice post one level high, to stand on the ground under a pipe laid a level up. Only for the look - a pipe hangs without it too - and it does not block the way.
 - Fuel: an idle boiler burns 1 unit a game hour, plus 0.05 for every radiator it feeds; a log is 6 units, the furnace holds 500.
 
 ## Building
@@ -19,7 +21,7 @@ A part is put down with a **placement cursor**: right-click the part in the inve
 
 - The part is drawn on the ground under the mouse, a boiler house and a water intake with their whole footprint. Red means it cannot go there; a click on a red one says why.
 - **R** turns it, and so does holding the button and dragging: a radiator and a heat unit to any of the four walls of the cell, a pump along either pipe, a boiler house with its front to the south or to the east.
-- Left click places, right click cancels. The cursor stays for pipes and radiators.
+- Left click places, right click cancels. The cursor stays for pipes, supports and radiators.
 - **Pipes**: a click lays one, holding the button and dragging lays a run from the pressed cell to the mouse (along x, then along y; up to 200 cells; cells already taken are passed over, the pipes are drawn joined the way they will lie). *Heating - Remove pipes* is the same cursor taking a run off. A pipe has nothing to turn, so **R** lifts its cursor a level instead: the cell under the mouse is marked, the pipe is drawn above it and goes there, laid from below; R again brings it back. A run that ends where nobody can stand (in the air, over water) is laid from its start.
 
 Who builds:
@@ -45,6 +47,7 @@ The objects cannot be picked up or broken with a sledgehammer.
 | Recipe | Skill | Ingredients (plus a welding mask) |
 |---|---|---|
 | 3 heating pipes | Welding 2 | 1 sheet metal, 1 torch use |
+| Pipe support | Welding 2 | 4 metal bars, 1 torch use |
 | Radiator | Welding 2 | 4 small sheet metal, 2 metal pipes, 2 torch uses |
 | Heat unit | Welding 3 | 2 sheet metal, 4 metal pipes, 6 nuts and bolts, 3 torch uses |
 | Pump station | Welding 4, Electrical 3 | 2 sheet metal, 2 metal pipes, 2 metal bars, engine parts, 4 electric wire, 10 scrap electronics, 10 screws, 4 torch uses |

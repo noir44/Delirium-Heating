@@ -30,6 +30,7 @@ require "DH_Shared"
 local MODULE = DelHeat.MODULE
 local PIPE, PUMP, INLET = DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET
 local RADIATOR, BOILER, INTAKE = DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE
+local SUPPORT = DelHeat.SUPPORT
 
 local Commands = {}
 
@@ -195,10 +196,32 @@ local function intakeWorks(intake, needsPower)
 	return not needsPower or intake.powered == true
 end
 
+-- The sides the cell takes a pipe on (DelHeat.sidesOf): all four for a pipe
+-- and a heat unit, the axis of a pump, the outlets of a boiler or an intake.
+local function sidesAt(s, key)
+	local kind = s.nodes[key]
+	if not kind then return 0 end
+	if kind == BOILER or kind == INTAKE then
+		local anchor = s.cells[key]
+		if not anchor then return 0 end
+		local ax, ay = DelHeat.unkey(anchor)
+		local x, y = DelHeat.unkey(key)
+		local boiler = s.boilers[anchor]
+		return DelHeat.sidesOf(kind, boiler and boiler.facing, x - ax, y - ay)
+	end
+	return DelHeat.sidesOf(kind, s.pumpFacing[key])
+end
+
+local function carries(kind)
+	return kind == PIPE or kind == PUMP or kind == INLET
+end
+
 -- Water leaves the start cells with `reach` cells ahead of it and runs
 -- through pipes, pumps and heat units; a working pump on the way sends it
--- on for pumpReach more. Returns best[cell] = the most cells still ahead of
--- the water there, and the structures (by anchor) the water arrives at.
+-- on for pumpReach more. In the plane it passes only where both cells take
+-- a pipe on the side they share; up and down, from pipe to pipe. Returns
+-- best[cell] = the most cells still ahead of the water there, and the
+-- structures (by anchor) the water arrives at.
 local function flood(s, starts, reach, pumpReach, needsPower)
 	local nodes = s.nodes
 	local best, touched, queue, head = {}, {}, {}, 1
@@ -207,30 +230,39 @@ local function flood(s, starts, reach, pumpReach, needsPower)
 		best[key] = reach
 		queue[#queue + 1] = key
 	end
+	local function enter(nkey, left)
+		local kind = nodes[nkey]
+		if carries(kind) then
+			local ahead = left - 1
+			if kind == PUMP and ahead < pumpReach and pumpWorks(s, nkey, needsPower) then
+				ahead = pumpReach
+			end
+			if (best[nkey] or -1) < ahead then
+				best[nkey] = ahead
+				queue[#queue + 1] = nkey
+			end
+		elseif kind == BOILER or kind == INTAKE then
+			local anchor = s.cells[nkey]
+			if anchor then touched[anchor] = true end
+		end
+	end
 	while head <= #queue do
 		local key = queue[head]
 		head = head + 1
 		local left = best[key]
 		if left > 0 then
 			local x, y, z = DelHeat.unkey(key)
-			local around = {
-				DelHeat.key(x, y - 1, z), DelHeat.key(x + 1, y, z), DelHeat.key(x, y + 1, z),
-				DelHeat.key(x - 1, y, z), DelHeat.key(x, y, z + 1), DelHeat.key(x, y, z - 1),
-			}
-			for _, nkey in ipairs(around) do
-				local kind = nodes[nkey]
-				if kind == PIPE or kind == PUMP or kind == INLET then
-					local ahead = left - 1
-					if kind == PUMP and ahead < pumpReach and pumpWorks(s, nkey, needsPower) then
-						ahead = pumpReach
-					end
-					if (best[nkey] or -1) < ahead then
-						best[nkey] = ahead
-						queue[#queue + 1] = nkey
-					end
-				elseif kind == BOILER or kind == INTAKE then
-					local anchor = s.cells[nkey]
-					if anchor then touched[anchor] = true end
+			local sides = sidesAt(s, key)
+			for _, dir in ipairs(DelHeat.DIRS) do
+				if DelHeat.hasSide(sides, dir.bit) then
+					local nkey = DelHeat.key(x + dir.dx, y + dir.dy, z)
+					if DelHeat.hasSide(sidesAt(s, nkey), dir.back) then enter(nkey, left) end
+				end
+			end
+			if carries(nodes[key]) then
+				for dz = -1, 1, 2 do
+					local nkey = DelHeat.key(x, y, z + dz)
+					if carries(nodes[nkey]) then enter(nkey, left) end
 				end
 			end
 		end
@@ -397,13 +429,19 @@ local function wantedSprites(s, x, y, z)
 		return { DelHeat.boilerSprite(boiler.facing, x - ax, y - ay) }
 	end
 	if kind == RADIATOR then return { DelHeat.radiatorSprite(s.rads[key]) } end
-	local mask = 0
-	for _, dir in ipairs(DelHeat.DIRS) do
-		local other = s.nodes[DelHeat.key(x + dir.dx, y + dir.dy, z)]
-		if other and other ~= RADIATOR then mask = mask + dir.bit end
-	end
+	if kind == SUPPORT then return { DelHeat.supportSprite() } end
 	local list = {}
-	if kind == PIPE or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask)) end
+	-- A pump's sprite carries its own length of pipe; a pipe and a heat unit
+	-- show an arm to every neighbour that takes a pipe from this side.
+	if kind ~= PUMP then
+		local mask = 0
+		for _, dir in ipairs(DelHeat.DIRS) do
+			if DelHeat.hasSide(sidesAt(s, DelHeat.key(x + dir.dx, y + dir.dy, z)), dir.back) then
+				mask = mask + dir.bit
+			end
+		end
+		if kind == PIPE or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask)) end
+	end
 	-- The pipe goes on up to the cell above.
 	local above = s.nodes[DelHeat.key(x, y, z + 1)]
 	if above == PIPE or above == PUMP or above == INLET then table.insert(list, DelHeat.riserSprite()) end
@@ -466,7 +504,7 @@ local function redrawAround(s, cells)
 	end
 end
 
--- nil when a pipe, a radiator or a heat unit (name) may go on the square,
+-- nil when a pipe, a radiator, a heat unit or a support (name) may go on the square,
 -- otherwise a translation key. A pipe above the ground wants no floor.
 local function blockedThin(s, square, x, y, z, name)
 	if not square then return "IGUI_DelHeat_NotLoaded" end
@@ -534,7 +572,7 @@ function Commands.place(player, args)
 	for _, cell in ipairs(cells) do
 		local square = squareAt(cell.x, cell.y, cell.z, name == "pipe")
 		local why
-		if name == "pipe" or name == "radiator" or name == "inlet" then
+		if name == "pipe" or name == "radiator" or name == "inlet" or name == "support" then
 			why = blockedThin(s, square, cell.x, cell.y, cell.z, name)
 		else
 			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
@@ -575,6 +613,8 @@ function Commands.place(player, args)
 		elseif name == "radiator" then
 			s.nodes[ckey] = RADIATOR
 			s.rads[ckey] = facing
+		elseif name == "support" then
+			s.nodes[ckey] = SUPPORT
 		else
 			s.nodes[ckey] = PIPE
 		end

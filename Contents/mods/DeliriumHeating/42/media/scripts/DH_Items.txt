@@ -19,6 +19,16 @@ module DelHeat
 		Tooltip = Tooltip_DelHeat_Pipe,
 	}
 
+	item Support
+	{
+		DisplayName = Pipe Support,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 6.0,
+		Icon = DelHeatSupport,
+		Tooltip = Tooltip_DelHeat_Support,
+	}
+
 	item Radiator
 	{
 		DisplayName = Radiator,

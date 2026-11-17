@@ -260,6 +260,15 @@ function DH_Cursor:render(x, y, z, square)
 	end
 	local facing = self:facing()
 	local ax, ay, size = DelHeat.anchorOf(self.kind, facing, x, y)
+	-- A support is a thin lattice: its ghost alone hardly shows which cell
+	-- it stands on, so the cell is marked on the floor under it.
+	if self.kind == "support" then
+		if ok then
+			self:getFloorCursorSprite():RenderGhostTileColor(x, y, z, 0.4, 1, 0.4, 0.8)
+		else
+			self:getFloorCursorSprite():RenderGhostTileColor(x, y, z, 1, 0.3, 0.3, 0.8)
+		end
+	end
 	for dy = 0, size.h - 1 do
 		for dx = 0, size.w - 1 do
 			local sprite = ghost(self:spriteAt(facing, dx, dy))

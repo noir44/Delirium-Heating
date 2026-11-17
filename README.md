@@ -10,6 +10,7 @@ District heating for a world without grid power: one boiler house heats a whole 
 - **Pipes in the air**, to cross a road: above the ground a pipe needs no floor. Lay it from the ground with the cursor lifted a level (**R**), or stand on an upper floor and drag the run out into the air. A pipe joins the pipe right above or below it, and the lower one shows a riser, so a run goes up, over and down again. A pipe one level up is taken apart from the ground below it.
 - **Pump stations**: the water travels 60 cells of pipe from an intake and 40 from a boiler house; a pump station on the way sends it 80 cells further. A pump needs electricity (a generator in range); without it it is just a pipe. It is turned along the pipe it stands on, east-west or north-south.
 - **Heat unit**: stands at a wall of a house (any of the four edges of its cell) on the end of a pipe. When hot water reaches it, every radiator within 10 cells of it works (three floors up and down; the radius is the sandbox option `InletRadius`) - no pipes inside the house.
+- **Water unit**: the heat unit's twin for cold water. Stands at a wall of a house on a pipe the intake's water reaches. It keeps a tank (200 l) that the intake's water fills at the intake's rate, and every 10 game minutes tops up the sinks, toilets, baths and showers within 10 cells of it (three floors up and down) - nothing has to be plumbed. Clean water by default; sandbox `TapClean` off gives the river's water as it is, to be boiled. A fixture plumbed to a barrel upstairs is left to its barrel; while the mains water is still on, nothing needs it.
 - **Radiators** stand in the rooms, at any of the four walls. A working one warms the air around it the way a vanilla fireplace does (an `IsoHeatSource`): walls and closed doors stop the heat. They start to warm at 30 degrees of water and give full heat at 80.
 - **Where things join.** A pipe joins the pipes around it on all four sides. A **pump station** carries its own length of pipe and joins only at its two ends: it is put into a line, turned along it; a pump turned across a line cuts it. A **boiler house** takes pipes only at the two pipe ends by its tank (on the corner cell: to the east and to the south with the front to the south; to the north and to the east with the front to the east). A **water intake** takes one at the pipe end coming out of the south face of its pad, on its south-east cell. A pipe lying against any other cell of them joins nothing, neither on the picture nor for the water.
 - **Pipe support**: a steel lattice post one level high, to stand on the ground under a pipe laid a level up. Only for the look - a pipe hangs without it too - and it does not block the way.
@@ -38,6 +39,7 @@ Right-click a thing of the heating and pick its name: its window opens (the menu
 - **Water intake**: working or without power, how many boiler houses its water reaches, its output and reach.
 - **Pump station**: working or without power, how far it sends the water, whether the boiler's and the intake's water get to it.
 - **Heat unit**: whether hot water reaches it and how hot it is, its radius, radiators in the radius.
+- **Water unit**: whether the intake's water reaches it, a tank bar, clean or river water, its radius, the plumbing in the radius and how many of those take water.
 - **Radiator**: a heat bar, the water temperature, the air temperature at it, how far the heat spreads.
 - **Pipe**: whether the boiler's and the intake's water get here and how many cells further they would go.
 - Every window has *Take apart* (greyed out with the reason for those who may not).
@@ -50,6 +52,7 @@ The objects cannot be picked up or broken with a sledgehammer.
 | Pipe support | Welding 2 | 4 metal bars, 1 torch use |
 | Radiator | Welding 2 | 4 small sheet metal, 2 metal pipes, 2 torch uses |
 | Heat unit | Welding 3 | 2 sheet metal, 4 metal pipes, 6 nuts and bolts, 3 torch uses |
+| Water unit | Welding 3 | 2 sheet metal, 4 metal pipes, 6 nuts and bolts, a rubber hose, 3 torch uses |
 | Pump station | Welding 4, Electrical 3 | 2 sheet metal, 2 metal pipes, 2 metal bars, engine parts, 4 electric wire, 10 scrap electronics, 10 screws, 4 torch uses |
 | Water intake kit | Welding 5, Electrical 4 | 6 sheet metal, 6 metal pipes, 4 metal bars, 2 engine parts, 2 rubber hoses, 6 electric wire, 15 scrap electronics, 20 screws, 8 torch uses |
 | Boiler house kit | Welding 7 | 20 sheet metal, 10 metal pipes, 10 metal bars, 60 clay bricks, 20 nuts and bolts, 10 torch uses |
@@ -73,6 +76,9 @@ The objects cannot be picked up or broken with a sledgehammer.
 | `PumpReach` | 80 | cells a working pump sends it further |
 | `PumpNeedsPower` | true | pumps and intakes work only on a powered square |
 | `InletRadius` | 10 | cells around a heat unit in which radiators work |
+| `TapClean` | true | water units give clean water; off - the river's water as it is |
+| `TapRadius` | 10 | cells around a water unit in which the plumbing is topped up |
+| `TapCapacity` | 200 | litres in a water unit's tank |
 | `RadiatorTemp` | 35 | air temperature at a radiator at full heat (a fireplace is 35) |
 | `RadiatorRadius` | 6 | cells at which the heat fades to nothing |
 | `PetrolPerLitre` | 2 | units per litre of petrol, 0 to refuse petrol |

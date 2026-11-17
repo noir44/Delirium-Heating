@@ -280,6 +280,23 @@ function DH_Window:inlet(d, y)
 	return self:reachLines(d, y)
 end
 
+function DH_Window:tap(d, y)
+	if d.fed then
+		y = self:addLine(y, getText("IGUI_DelHeat_TapFed"), GREEN)
+	else
+		y = self:addLine(y, getText("IGUI_DelHeat_TapDry"), RED)
+	end
+	local capacity = tonumber(d.capacity) or 1
+	y = self:addBar(y, getText("IGUI_DelHeat_TapTank", tostring(d.litres or 0), tostring(math.floor(capacity))),
+		(tonumber(d.litres) or 0) / capacity, WATER_COLOUR)
+	y = self:addLine(y, getText(d.clean and "IGUI_DelHeat_TapClean" or "IGUI_DelHeat_TapTainted"), d.clean and WHITE or RED)
+	y = self:addLine(y, getText("IGUI_DelHeat_TapRadius", tostring(DelHeat.tapRadius())))
+	y = self:addLine(y, getText("IGUI_DelHeat_TapFixtures", tostring(d.fixtures or 0), tostring(d.fillable or 0)))
+	y = self:addLine(y, getText("IGUI_DelHeat_TapRate", tostring(math.floor(DelHeat.intakeRate()))), GREY)
+	if d.by then y = self:addLine(y, getText("IGUI_DelHeat_BuiltBy", tostring(d.by)), GREY) end
+	return self:reachLines(d, y)
+end
+
 function DH_Window:radiator(d, y)
 	local level = tonumber(d.level) or 0
 	if not d.fed then
@@ -334,6 +351,8 @@ function DH_Window:refresh()
 		y = self:inlet(d, y)
 	elseif kind == DelHeat.RADIATOR then
 		y = self:radiator(d, y)
+	elseif kind == DelHeat.TAP then
+		y = self:tap(d, y)
 	elseif kind == DelHeat.SUPPORT then
 		y = self:addLine(y, getText("IGUI_DelHeat_SupportInfo"), GREY)
 	else

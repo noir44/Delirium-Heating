@@ -29,6 +29,7 @@ DH_Cursor = ISBuildingObject:derive("DH_Cursor")
 local FACINGS = {
 	radiator = { "W", "N", "E", "S" },
 	inlet = { "W", "N", "E", "S" },
+	tap = { "W", "N", "E", "S" },
 	pump = { "E", "S", "E", "S" },
 	boiler = { "E", "S", "E", "S" },
 }
@@ -109,6 +110,7 @@ function DH_Cursor:spriteAt(facing, dx, dy)
 	local kind = self.kind
 	if kind == "radiator" then return DelHeat.radiatorSprite(facing) end
 	if kind == "inlet" then return DelHeat.inletSprite(facing) end
+	if kind == "tap" then return DelHeat.tapSprite(facing) end
 	if kind == "pump" then return DelHeat.pumpSprite(facing) end
 	if kind == "boiler" then return DelHeat.boilerSprite(facing, dx, dy) end
 	if kind == "intake" then return DelHeat.intakeSprite(dx, dy) end

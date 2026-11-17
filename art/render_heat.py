@@ -1,6 +1,6 @@
 # Models and renders every Delirium Heating sprite with the PZ camera:
 # 16 pipes (by neighbour mask), the riser, the pipe support, 2 pumps, 4 heat
-# units, 4 radiators, 2 boiler houses, the water intake.
+# units, 4 water units, 4 radiators, 2 boiler houses, the water intake.
 #   blender --background --factory-startup --python render_heat.py -- <out_dir> [name ...]
 # Writes <out_dir>/<name>_color.png (4x) and, for the boilers, <name>_mask.png
 # (which cell every pixel stands on); cut_heat.py turns them into the frames.
@@ -296,7 +296,8 @@ def build_pump(degrees):
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
-def build_inlet(degrees):
+def build_inlet(degrees, body="green", valve="red"):
+    # The water unit is the same cabinet painted blue, with white handles.
     # Heat unit: a cabinet at the north edge of the cell (turned for the
     # other three walls), fed by two pipes from the main in the middle of
     # the cell, with the valves on top. The house lines leave through the
@@ -307,14 +308,14 @@ def build_inlet(degrees):
         cyl((x, -0.5, Z_PIPE), (x, y, Z_PIPE), 0.042, M["steel"], 16)
         ball((x, y, Z_PIPE), 0.042, M["steel"])
         cyl((x, y, Z_PIPE), (x, y, 0.32), 0.042, M["steel"], 16)
-    box(0.29, 0.71, y - 0.11, y + 0.11, 0.30, 0.92, M["green"])
+    box(0.29, 0.71, y - 0.11, y + 0.11, 0.30, 0.92, M[body])
     box(0.32, 0.68, y - 0.125, y - 0.11, 0.35, 0.87, M["steel"])
     box(0.63, 0.66, y - 0.135, y - 0.125, 0.55, 0.67, M["dark"])
     cyl((0.42, y - 0.14, 0.76), (0.42, y - 0.125, 0.76), 0.055, M["white"], 24)
     cyl((0.42, y - 0.142, 0.76), (0.42, y - 0.14, 0.76), 0.062, M["dark"], 24)
     for x in (0.40, 0.60):
         cyl((x, y, 0.92), (x, y, 1.02), 0.02, M["steel"], 12)
-        cyl((x, y, 1.02), (x, y, 1.04), 0.075, M["red"], 24)
+        cyl((x, y, 1.02), (x, y, 1.04), 0.075, M[valve], 24)
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
@@ -586,6 +587,7 @@ shoot("support", build_support, 256, 96)
 for facing, degrees in (("N", 0), ("W", 90), ("S", 180), ("E", 270)):
     shoot("radiator_" + facing, lambda: build_radiator(degrees), 256, 96)
     shoot("inlet_" + facing, lambda: build_inlet(degrees), 256, 96)
+    shoot("tap_" + facing, lambda: build_inlet(degrees, "blue", "white"), 256, 96)
 # The boilers and the intake: a 384x384 image of the 3x3 cells around, as in
 # Delirium-Mines.
 for facing in ("S", "E"):

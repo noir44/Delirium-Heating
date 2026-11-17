@@ -161,6 +161,37 @@ option DelHeat.InletRadius
 	translation = DelHeat_InletRadius,
 }
 
+option DelHeat.TapClean
+{
+	type = boolean,
+	default = true,
+
+	page = DelHeat,
+	translation = DelHeat_TapClean,
+}
+
+option DelHeat.TapRadius
+{
+	type = integer,
+	min = 1,
+	max = 100,
+	default = 10,
+
+	page = DelHeat,
+	translation = DelHeat_TapRadius,
+}
+
+option DelHeat.TapCapacity
+{
+	type = integer,
+	min = 1,
+	max = 100000,
+	default = 200,
+
+	page = DelHeat,
+	translation = DelHeat_TapCapacity,
+}
+
 option DelHeat.RadiatorTemp
 {
 	type = integer,

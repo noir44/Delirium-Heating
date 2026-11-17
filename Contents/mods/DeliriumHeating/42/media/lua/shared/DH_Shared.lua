@@ -28,7 +28,8 @@
 --   28..33  boiler with its front to the east, 2 wide x 3 deep (dy * 2 + dx),
 --   34..37  water intake, 2 x 2 (dy * 2 + dx),
 --   41      riser: the pipe going up to the cell above,
---   43      pipe support: a steel lattice post one level high, only for the look;
+--   43      pipe support: a steel lattice post one level high, only for the look,
+--   44..47  water unit at the north, west, south, east edge of its cell;
 -- (dx, dy) counted from the structure's north-west cell, its anchor.
 --
 -- Where things join. A pipe and a heat unit take a pipe on all four sides.
@@ -52,14 +53,17 @@ DelHeat.TILESET = "delheat_01_"
 DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET = "p", "u", "i"
 DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE = "r", "b", "w"
 DelHeat.SUPPORT = "s"
+-- Water unit: the heat unit's twin for the intake's cold water. It keeps a
+-- tank filled from the pipe and tops up the sinks, toilets and baths around.
+DelHeat.TAP = "t"
 
 -- Kind -> the name the commands, the items and the translations use.
-DelHeat.NAME = { p = "pipe", u = "pump", i = "inlet", r = "radiator", b = "boiler", w = "intake", s = "support" }
+DelHeat.NAME = { p = "pipe", u = "pump", i = "inlet", r = "radiator", b = "boiler", w = "intake", s = "support", t = "tap" }
 -- What a player builds each of, and gets back when it is taken apart.
 DelHeat.ITEM = {
 	pipe = "DelHeat.Pipe", pump = "DelHeat.Pump", inlet = "DelHeat.Inlet",
 	radiator = "DelHeat.Radiator", boiler = "DelHeat.Boiler", intake = "DelHeat.Intake",
-	support = "DelHeat.Support",
+	support = "DelHeat.Support", tap = "DelHeat.WaterUnit",
 }
 -- The tool a player needs on them to build or take apart.
 DelHeat.TOOL = "Base.PipeWrench"
@@ -78,6 +82,7 @@ DelHeat.SPRITE_RADIATOR = { N = 18, W = 19, S = 20, E = 21 }
 DelHeat.SPRITE_BOILER = { S = 22, E = 28 }
 DelHeat.SPRITE_INTAKE = 34
 DelHeat.SPRITE_SUPPORT = 43
+DelHeat.SPRITE_TAP = { N = 44, W = 45, S = 46, E = 47 }
 -- The four edges of a cell a radiator or a heat unit stands at.
 DelHeat.RADIATOR_FACINGS = { "N", "W", "S", "E" }
 DelHeat.BOILER_FACINGS = { "S", "E" }
@@ -109,7 +114,7 @@ end
 -- kind, and for a pump or a boiler its facing, for a boiler or an intake the
 -- cell (dx, dy from the anchor).
 function DelHeat.sidesOf(kind, facing, dx, dy)
-	if kind == DelHeat.PIPE or kind == DelHeat.INLET then return DelHeat.ALL_SIDES end
+	if kind == DelHeat.PIPE or kind == DelHeat.INLET or kind == DelHeat.TAP then return DelHeat.ALL_SIDES end
 	if kind == DelHeat.PUMP then return DelHeat.PUMP_SIDES[facing] or DelHeat.PUMP_SIDES.E end
 	if kind == DelHeat.BOILER then
 		local ports = DelHeat.BOILER_PORTS[facing] or DelHeat.BOILER_PORTS.S
@@ -180,6 +185,11 @@ function DelHeat.pumpReach() return math.floor(number(sandbox().PumpReach, 80, 1
 function DelHeat.pumpNeedsPower() return sandbox().PumpNeedsPower ~= false end
 -- Cells around a heat unit in which radiators work.
 function DelHeat.inletRadius() return math.floor(number(sandbox().InletRadius, 10, 1)) end
+-- Water unit: the plumbing it serves (same floors as a heat unit), its tank,
+-- and whether it gives clean water or the river's as it is.
+function DelHeat.tapRadius() return math.floor(number(sandbox().TapRadius, 10, 1)) end
+function DelHeat.tapCapacity() return number(sandbox().TapCapacity, 200, 1) end
+function DelHeat.tapClean() return sandbox().TapClean ~= false end
 -- A vanilla fireplace is a heat source of 35 degrees.
 function DelHeat.radiatorTemp() return math.floor(number(sandbox().RadiatorTemp, 35, 1)) end
 function DelHeat.radiatorRadius() return math.floor(number(sandbox().RadiatorRadius, 6, 1)) end
@@ -284,6 +294,10 @@ function DelHeat.inletSprite(facing)
 	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_INLET[facing] or DelHeat.SPRITE_INLET.N)
 end
 
+function DelHeat.tapSprite(facing)
+	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_TAP[facing] or DelHeat.SPRITE_TAP.N)
+end
+
 function DelHeat.supportSprite()
 	return DelHeat.TILESET .. tostring(DelHeat.SPRITE_SUPPORT)
 end
@@ -318,6 +332,9 @@ function DelHeat.parseSprite(name)
 	end
 	for facing, sprite in pairs(DelHeat.SPRITE_INLET) do
 		if index == sprite then return { kind = DelHeat.INLET, facing = facing } end
+	end
+	for facing, sprite in pairs(DelHeat.SPRITE_TAP) do
+		if index == sprite then return { kind = DelHeat.TAP, facing = facing } end
 	end
 	for facing, sprite in pairs(DelHeat.SPRITE_RADIATOR) do
 		if index == sprite then return { kind = DelHeat.RADIATOR, facing = facing } end

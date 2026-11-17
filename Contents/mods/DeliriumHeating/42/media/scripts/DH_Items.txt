@@ -49,6 +49,16 @@ module DelHeat
 		Tooltip = Tooltip_DelHeat_Inlet,
 	}
 
+	item WaterUnit
+	{
+		DisplayName = Water Unit,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 10.0,
+		Icon = DelHeatWaterUnit,
+		Tooltip = Tooltip_DelHeat_WaterUnit,
+	}
+
 	item Pump
 	{
 		DisplayName = Pump Station,

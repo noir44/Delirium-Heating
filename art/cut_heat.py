@@ -31,6 +31,7 @@ PUMP = {"E": 16, "S": 42}
 INLET = {"N": 17, "W": 38, "S": 39, "E": 40}
 RISER = 41
 SUPPORT = 43
+TAP = {"N": 44, "W": 45, "S": 46, "E": 47}
 # One level up is 192 px at 2x.
 LEVEL = 192
 RADIATOR = {"N": 18, "W": 19, "S": 20, "E": 21}
@@ -136,8 +137,8 @@ def scene():
         cells.setdefault((x, y, z), []).extend(indices)
 
     nodes = {(x, 3, 0) for x in range(0, 7)} | {(3, y, 0) for y in range(0, 7)} | {(6, y, 0) for y in range(3, 6)}
-    nodes |= {(0, 4, 0), (0, 5, 0), (0, 9, 0), (0, 10, 0)} | {(0, y, 1) for y in range(5, 10)}
-    devices = {(6, 5, 0): INLET["E"], (4, 3, 0): PUMP["E"], (3, 5, 0): PUMP["S"], (3, 0, 0): INLET["N"], (3, 6, 0): INLET["S"], (0, 10, 0): INLET["W"]}
+    nodes |= {(0, 4, 0), (0, 5, 0), (0, 9, 0), (0, 10, 0), (6, 2, 0)} | {(0, y, 1) for y in range(5, 10)}
+    devices = {(6, 5, 0): INLET["E"], (4, 3, 0): PUMP["E"], (3, 5, 0): PUMP["S"], (3, 0, 0): INLET["N"], (3, 6, 0): INLET["S"], (0, 10, 0): INLET["W"], (6, 2, 0): TAP["N"]}
     for (x, y, z) in nodes:
         mask = sum(bit for bit, (dx, dy) in ((1, (0, -1)), (2, (1, 0)), (4, (0, 1)), (8, (-1, 0)))
                    if (x + dx, y + dy, z) in nodes)
@@ -186,7 +187,7 @@ def tiles_json():
         add(index, SOLID)
     add(RISER)
     add(SUPPORT)
-    for index in list(RADIATOR.values()) + list(INLET.values()):
+    for index in list(RADIATOR.values()) + list(INLET.values()) + list(TAP.values()):
         add(index)
     for first, wide, deep in STRUCTURES.values():
         for cell in range(wide * deep):
@@ -208,6 +209,8 @@ def main():
         single("radiator_" + facing, index)
     for facing, index in INLET.items():
         single("inlet_" + facing, index)
+    for facing, index in TAP.items():
+        single("tap_" + facing, index)
     for name in STRUCTURES:
         structure(name)
     tiles_json()
@@ -216,6 +219,7 @@ def main():
     icon(frame(RADIATOR["N"]), "Radiator")
     icon(frame(SUPPORT), "Support")
     icon(frame(INLET["N"]), "Inlet")
+    icon(frame(TAP["N"]), "WaterUnit")
     icon(frame(PUMP["E"]), "Pump")
     icon(assemble("intake"), "Intake")
     icon(assemble("boiler_S"), "Boiler")

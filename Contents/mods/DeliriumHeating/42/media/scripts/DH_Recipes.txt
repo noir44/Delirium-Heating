@@ -91,6 +91,29 @@ module DelHeat
 		}
 	}
 
+	craftRecipe MakeWaterUnit
+	{
+		timedAction = Welding,
+		time = 400,
+		SkillRequired = MetalWelding:3,
+		Tags = InHandCraft,
+		category = Heating,
+		xpAward = MetalWelding:20,
+		inputs
+		{
+			item 2 [Base.SheetMetal],
+			item 4 [Base.MetalPipe],
+			item 6 [Base.NutsBolts],
+			item 1 [Base.RubberHose],
+			item 3 [Base.BlowTorch],
+			item 1 tags[base:weldingmask] mode:keep,
+		}
+		outputs
+		{
+			item 1 DelHeat.WaterUnit,
+		}
+	}
+
 	craftRecipe MakeHeatingPump
 	{
 		timedAction = Welding,

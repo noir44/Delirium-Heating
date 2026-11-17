@@ -30,9 +30,9 @@ end
 -- levels = { ["x,y,z"] = 0..LEVELS } for every radiator a heat unit serves;
 -- status = { boilers = { [anchor] = { facing, fuel, water, temp, on, load, supply } },
 --            pumps = { [cell] = works }, intakes = { [anchor] = works },
---            inlets = { [cell] = true } }
+--            inlets = { [cell] = true }, taps = { [cell] = { fed, water } } }
 local levels = {}
-local status = { boilers = {}, pumps = {}, intakes = {}, inlets = {} }
+local status = { boilers = {}, pumps = {}, intakes = {}, inlets = {}, taps = {} }
 local received = false
 
 local function request()
@@ -133,7 +133,7 @@ end
 -- asks for its thing again.
 function Replies.status(args)
 	status = {}
-	for _, name in ipairs({ "boilers", "pumps", "intakes", "inlets" }) do
+	for _, name in ipairs({ "boilers", "pumps", "intakes", "inlets", "taps" }) do
 		status[name] = type(args[name]) == "table" and args[name] or {}
 	end
 	DH_Window.ask()
@@ -210,6 +210,13 @@ local function infoLines(node)
 		if status.inlets[node.key] then return { GREEN .. getText("IGUI_DelHeat_InletFed") } end
 		return { RED .. getText("IGUI_DelHeat_InletDry") }
 	end
+	if node.kind == DelHeat.TAP then
+		local tap = status.taps[node.key]
+		if not tap then return nil end
+		local tank = getText("IGUI_DelHeat_TapTank", tostring(tap.water or 0), tostring(math.floor(DelHeat.tapCapacity())))
+		if tap.fed then return { GREEN .. getText("IGUI_DelHeat_TapFed"), tank } end
+		return { RED .. getText("IGUI_DelHeat_TapDry"), tank }
+	end
 	return nil
 end
 
@@ -254,9 +261,10 @@ end
 -- the item and the distance again).
 -- ---------------------------------------------------------------------------
 
-DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800, support = 150 }
+DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800, support = 150,
+	tap = 250 }
 -- The parts in the order the menu shows them.
-DelHeat.PARTS = { "pipe", "support", "radiator", "inlet", "pump", "intake", "boiler" }
+DelHeat.PARTS = { "pipe", "support", "radiator", "inlet", "tap", "pump", "intake", "boiler" }
 
 -- cells: where the work is ({ x, y, z }), best first - the cell built on,
 -- or the two ends of a run.

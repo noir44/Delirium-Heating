@@ -30,7 +30,7 @@ require "DH_Shared"
 local MODULE = DelHeat.MODULE
 local PIPE, PUMP, INLET = DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET
 local RADIATOR, BOILER, INTAKE = DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE
-local SUPPORT = DelHeat.SUPPORT
+local SUPPORT, TAP = DelHeat.SUPPORT, DelHeat.TAP
 
 local Commands = {}
 
@@ -57,7 +57,7 @@ end
 
 local function state()
 	local s = ModData.getOrCreate(DelHeat.STATE_KEY)
-	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "inlets", "pumps", "pumpFacing" }) do
+	for _, name in ipairs({ "nodes", "cells", "boilers", "intakes", "rads", "inlets", "pumps", "pumpFacing", "taps" }) do
 		if type(s[name]) ~= "table" then s[name] = {} end
 	end
 	return s
@@ -213,7 +213,7 @@ local function sidesAt(s, key)
 end
 
 local function carries(kind)
-	return kind == PIPE or kind == PUMP or kind == INLET
+	return kind == PIPE or kind == PUMP or kind == INLET or kind == TAP
 end
 
 -- Water leaves the start cells with `reach` cells ahead of it and runs
@@ -388,7 +388,11 @@ local function statusOf(s)
 	for key, _ in pairs(n.inlets) do
 		inlets[key] = true
 	end
-	return { boilers = boilers, pumps = pumps, intakes = intakes, inlets = inlets }
+	local taps = {}
+	for key, tap in pairs(s.taps) do
+		taps[key] = { fed = n.water[key] ~= nil, water = math.floor((tonumber(tap.water) or 0) + 0.5) }
+	end
+	return { boilers = boilers, pumps = pumps, intakes = intakes, inlets = inlets, taps = taps }
 end
 
 -- To everyone; the heat only when it changed (or forced).
@@ -444,9 +448,10 @@ local function wantedSprites(s, x, y, z)
 	end
 	-- The pipe goes on up to the cell above.
 	local above = s.nodes[DelHeat.key(x, y, z + 1)]
-	if above == PIPE or above == PUMP or above == INLET then table.insert(list, DelHeat.riserSprite()) end
+	if above == PIPE or above == PUMP or above == INLET or above == TAP then table.insert(list, DelHeat.riserSprite()) end
 	if kind == PUMP then table.insert(list, DelHeat.pumpSprite(s.pumpFacing[key])) end
 	if kind == INLET then table.insert(list, DelHeat.inletSprite(s.inlets[key])) end
+	if kind == TAP then table.insert(list, DelHeat.tapSprite(s.taps[key] and s.taps[key].facing)) end
 	return list
 end
 
@@ -557,7 +562,7 @@ function Commands.place(player, args)
 	if name == "boiler" then
 		facing = oneOf(DelHeat.BOILER_FACINGS, args.facing)
 		if not facing then return end
-	elseif name == "radiator" or name == "inlet" then
+	elseif name == "radiator" or name == "inlet" or name == "tap" then
 		facing = oneOf(DelHeat.RADIATOR_FACINGS, args.facing) or "N"
 	elseif name == "pump" then
 		facing = oneOf(DelHeat.PUMP_FACINGS, args.facing) or "E"
@@ -572,7 +577,7 @@ function Commands.place(player, args)
 	for _, cell in ipairs(cells) do
 		local square = squareAt(cell.x, cell.y, cell.z, name == "pipe")
 		local why
-		if name == "pipe" or name == "radiator" or name == "inlet" or name == "support" then
+		if name == "pipe" or name == "radiator" or name == "inlet" or name == "support" or name == "tap" then
 			why = blockedThin(s, square, cell.x, cell.y, cell.z, name)
 		else
 			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
@@ -610,6 +615,9 @@ function Commands.place(player, args)
 		elseif name == "inlet" then
 			s.nodes[ckey] = INLET
 			s.inlets[ckey] = facing
+		elseif name == "tap" then
+			s.nodes[ckey] = TAP
+			s.taps[ckey] = { facing = facing, water = 0, fixtures = 0, fillable = 0, by = player:getUsername() }
 		elseif name == "radiator" then
 			s.nodes[ckey] = RADIATOR
 			s.rads[ckey] = facing
@@ -758,6 +766,7 @@ function Commands.remove(player, args)
 		s.cells[ckey] = nil
 		s.rads[ckey] = nil
 		s.inlets[ckey] = nil
+		s.taps[ckey] = nil
 		s.pumps[ckey] = nil
 		s.pumpFacing[ckey] = nil
 	end
@@ -852,6 +861,14 @@ function Commands.info(player, args)
 		out.heat, out.water = n.heat[key], n.water[key]
 		if kind == PUMP then
 			out.works = pumpWorks(s, key, needsPower)
+		elseif kind == TAP then
+			local tap = s.taps[key] or {}
+			out.fed = n.water[key] ~= nil
+			out.litres = math.floor((tonumber(tap.water) or 0) + 0.5)
+			out.capacity = DelHeat.tapCapacity()
+			out.fixtures, out.fillable = tap.fixtures or 0, tap.fillable or 0
+			out.clean = DelHeat.tapClean()
+			out.by = tap.by
 		elseif kind == INLET then
 			out.fed = n.inlets[key] ~= nil
 			out.temp = hottest(s, n.inlets[key])
@@ -989,9 +1006,79 @@ end
 
 -- Power is read only where the square is loaded; elsewhere a pump or an
 -- intake keeps the state it was last seen in.
+-- ---------------------------------------------------------------------------
+-- Water units
+-- ---------------------------------------------------------------------------
+
+-- A sink, a toilet, a bath, a shower: what vanilla lets a player plumb
+-- (ISMoveableSpriteProps), with a tank of its own to fill. One plumbed to a
+-- barrel upstairs is left to its barrel.
+local function fixtureTank(object)
+	local sprite = object:getSprite()
+	local props = sprite and sprite:getProperties()
+	if not props or not props:has(IsoFlagType.waterPiped) then return nil, false end
+	if object:getUsesExternalWaterSource() then return nil, true end
+	local tank = object:getFluidContainer()
+	if not tank or tank:getCapacity() <= 0 then return nil, true end
+	-- Mains water still on: it needs nothing.
+	if object:getFluidCapacity() >= 10000 then return nil, true end
+	return tank, true
+end
+
+-- Every ten game minutes: the tank takes in what the intake's water brings,
+-- then tops up the plumbing within the radius. What a fixture really took is
+-- measured on its tank, so one the game would not fill costs nothing.
+local function serveTap(s, n, key, tap)
+	local capacity = DelHeat.tapCapacity()
+	local water = math.min(capacity, tonumber(tap.water) or 0)
+	if n.water[key] ~= nil then water = math.min(capacity, water + DelHeat.intakeRate() / 6) end
+	local x, y, z = DelHeat.unkey(key)
+	local radius, floors = DelHeat.tapRadius(), DelHeat.INLET_FLOORS
+	local fluid = DelHeat.tapClean() and FluidType.Water or FluidType.TaintedWater
+	local fixtures, fillable = 0, 0
+	local cell = getCell()
+	for fz = z - floors, z + floors do
+		for fy = y - radius, y + radius do
+			for fx = x - radius, x + radius do
+				local square = cell:getGridSquare(fx, fy, fz)
+				if square then
+					local objects = square:getObjects()
+					for i = 0, objects:size() - 1 do
+						local object = objects:get(i)
+						local tank, fixture = fixtureTank(object)
+						if fixture then fixtures = fixtures + 1 end
+						if tank then
+							fillable = fillable + 1
+							local before = tank:getAmount()
+							local give = math.min(tank:getCapacity() - before, water)
+							if give >= 0.5 then
+								object:emptyFluid()
+								object:addFluid(fluid, before + give)
+								object:transmitModData()
+								water = water - math.max(0, tank:getAmount() - before)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	local changed = math.floor(water) ~= math.floor(tonumber(tap.water) or 0)
+		or fixtures ~= tap.fixtures or fillable ~= tap.fillable
+	tap.water, tap.fixtures, tap.fillable = water, fixtures, fillable
+	return changed
+end
+
 local function everyTenMinutes()
 	local s = state()
 	local any = false
+	local n = network(s)
+	for key, tap in pairs(s.taps) do
+		any = true
+		local x, y, z = DelHeat.unkey(key)
+		-- An unloaded unit waits: there is nobody near to use the water.
+		if x and getCell():getGridSquare(x, y, z) then serveTap(s, n, key, tap) end
+	end
 	for key, was in pairs(s.pumps) do
 		any = true
 		local x, y, z = DelHeat.unkey(key)

@@ -48,18 +48,18 @@ local function ghost(name)
 	return sprite
 end
 
--- The pipe sprite a cell would get: its neighbours on the ground and in the
--- run being drawn.
-local function maskAt(x, y, z, run)
+-- The pipe sprite a cell of `medium` would get: its neighbours on the
+-- ground and in the run being drawn.
+local function maskAt(x, y, z, run, medium)
 	local mask = 0
 	for _, dir in ipairs(DelHeat.DIRS) do
 		local nx, ny = x + dir.dx, y + dir.dy
 		local joins = run[DelHeat.key(nx, ny, z)] == true
 		if not joins then
-			-- Only a neighbour that takes a pipe from this side: a pump along
-			-- its axis, a boiler or an intake at an outlet.
+			-- Only a neighbour that takes this pipe from this side: a pump
+			-- along its axis, a boiler or an intake at an outlet of the medium.
 			local node = DelHeat.nodeAt(getCell():getGridSquare(nx, ny, z))
-			joins = DelHeat.hasSide(DelHeat.sidesOfNode(node, nx, ny), dir.back)
+			joins = DelHeat.joins(medium, DelHeat.sideMediumOfNode(node, nx, ny, dir.back))
 		end
 		if joins then mask = mask + dir.bit end
 	end
@@ -115,7 +115,7 @@ function DH_Cursor:spriteAt(facing, dx, dy)
 	if kind == "boiler" then return DelHeat.boilerSprite(facing, dx, dy) end
 	if kind == "intake" then return DelHeat.intakeSprite(dx, dy) end
 	if kind == "support" then return DelHeat.supportSprite() end
-	return DelHeat.pipeSprite(0)
+	return DelHeat.pipeSprite(0, self.medium)
 end
 
 -- Vanilla asks for the sprite by nSprite; ours depends on the part.
@@ -180,13 +180,13 @@ function DH_Cursor:run(x, y, z)
 		local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
 		local node = DelHeat.nodeAt(square)
 		if self.kind == "unpipe" then
-			cell.pipe = node ~= nil and node.kind == DelHeat.PIPE
+			cell.pipe = node ~= nil and DelHeat.isPipeKind(node.kind)
 		else
 			-- A cell that holds something is passed over; one on the ground
 			-- without a floor stops the run.
 			cell.taken = node ~= nil
 			cell.bad = not cell.taken and noFloor(square, cell.x, cell.y, cell.z)
-			cell.sprite = DelHeat.pipeSprite(maskAt(cell.x, cell.y, cell.z, run))
+			cell.sprite = DelHeat.pipeSprite(maskAt(cell.x, cell.y, cell.z, run, self.medium), self.medium)
 		end
 	end
 	self.runCells = cells
@@ -204,7 +204,7 @@ function DH_Cursor:why(square)
 		if #cells > DelHeat.MAX_LINE then
 			return getText("IGUI_DelHeat_LineTooLong", tostring(DelHeat.MAX_LINE))
 		end
-		if self.kind == "pipe" and #cells == 1 then
+		if self.kind ~= "unpipe" and #cells == 1 then
 			if cells[1].taken then return getText("IGUI_DelHeat_Occupied") end
 			if cells[1].bad then return getText("IGUI_DelHeat_NoFloor") end
 		end
@@ -293,15 +293,15 @@ function DH_Cursor:create(x, y, z, north, sprite)
 		self.endX, self.endY = nil, nil
 		self.runKey = nil
 		local length = math.abs(ex - x) + math.abs(ey - y) + 1
-		if self.kind == "pipe" and length == 1 then
-			DelHeat.act(player, { here }, "place", { x = x, y = y, z = z, kind = "pipe" }, DelHeat.TIME.pipe)
+		if self.kind ~= "unpipe" and length == 1 then
+			DelHeat.act(player, { here }, "place", { x = x, y = y, z = z, kind = self.kind }, DelHeat.TIME[self.kind])
 			return
 		end
 		-- The far end first; a run out into the air is laid from its start.
 		local ends = { { x = ex, y = ey, z = z }, here }
-		local run = { x1 = x, y1 = y, x2 = ex, y2 = ey, z = z }
-		if self.kind == "pipe" then
-			local count = self.admin and length or math.min(length, DelHeat.countOf(player, DelHeat.ITEM.pipe))
+		local run = { x1 = x, y1 = y, x2 = ex, y2 = ey, z = z, kind = self.kind }
+		if self.kind ~= "unpipe" then
+			local count = self.admin and length or math.min(length, DelHeat.countOf(player, DelHeat.ITEM[self.kind]))
 			DelHeat.act(player, ends, "line", run, math.min(1500, 60 + 40 * count))
 		else
 			DelHeat.act(player, ends, "unline", run, math.min(1500, 60 + 30 * length))
@@ -322,7 +322,9 @@ function DH_Cursor:new(character, kind)
 	o.character = character
 	o.player = character:getPlayerNum()
 	o.kind = kind
-	o.pipes = kind == "pipe" or kind == "unpipe"
+	o.pipes = DelHeat.isPipeName(kind) or kind == "unpipe"
+	-- The water a pipe cursor lays a pipe for.
+	o.medium = kind == "coldpipe" and DelHeat.COLD_WATER or DelHeat.HOT_WATER
 	-- Levels above the one pointed at (pipes only, the rotate key).
 	o.lift = 0
 	o.solid = kind == "pump" or kind == "boiler" or kind == "intake"
@@ -340,7 +342,7 @@ end
 function DH_Cursor.start(player, kind)
 	getCell():setDrag(DH_Cursor:new(player, kind), player:getPlayerNum())
 	local hint = "IGUI_DelHeat_CursorHint"
-	if kind == "pipe" then
+	if DelHeat.isPipeName(kind) then
 		hint = "IGUI_DelHeat_CursorHintPipe"
 	elseif kind == "unpipe" then
 		hint = "IGUI_DelHeat_CursorHintUnpipe"

@@ -2,7 +2,7 @@
   "pack": "delheat",
   "tileset": "delheat_01",
   "columns": 8,
-  "rows": 8,
+  "rows": 9,
   "tiles": [
     {
       "index": 0,
@@ -297,6 +297,91 @@
         "solidtrans": "",
         "BlocksPlacement": ""
       }
+    },
+    {
+      "index": 48,
+      "png": "frames/delheat_01_48.png",
+      "props": {}
+    },
+    {
+      "index": 49,
+      "png": "frames/delheat_01_49.png",
+      "props": {}
+    },
+    {
+      "index": 50,
+      "png": "frames/delheat_01_50.png",
+      "props": {}
+    },
+    {
+      "index": 51,
+      "png": "frames/delheat_01_51.png",
+      "props": {}
+    },
+    {
+      "index": 52,
+      "png": "frames/delheat_01_52.png",
+      "props": {}
+    },
+    {
+      "index": 53,
+      "png": "frames/delheat_01_53.png",
+      "props": {}
+    },
+    {
+      "index": 54,
+      "png": "frames/delheat_01_54.png",
+      "props": {}
+    },
+    {
+      "index": 55,
+      "png": "frames/delheat_01_55.png",
+      "props": {}
+    },
+    {
+      "index": 56,
+      "png": "frames/delheat_01_56.png",
+      "props": {}
+    },
+    {
+      "index": 57,
+      "png": "frames/delheat_01_57.png",
+      "props": {}
+    },
+    {
+      "index": 58,
+      "png": "frames/delheat_01_58.png",
+      "props": {}
+    },
+    {
+      "index": 59,
+      "png": "frames/delheat_01_59.png",
+      "props": {}
+    },
+    {
+      "index": 60,
+      "png": "frames/delheat_01_60.png",
+      "props": {}
+    },
+    {
+      "index": 61,
+      "png": "frames/delheat_01_61.png",
+      "props": {}
+    },
+    {
+      "index": 62,
+      "png": "frames/delheat_01_62.png",
+      "props": {}
+    },
+    {
+      "index": 63,
+      "png": "frames/delheat_01_63.png",
+      "props": {}
+    },
+    {
+      "index": 64,
+      "png": "frames/delheat_01_64.png",
+      "props": {}
     }
   ]
 }

@@ -30,7 +30,8 @@ require "DH_Shared"
 local MODULE = DelHeat.MODULE
 local PIPE, PUMP, INLET = DelHeat.PIPE, DelHeat.PUMP, DelHeat.INLET
 local RADIATOR, BOILER, INTAKE = DelHeat.RADIATOR, DelHeat.BOILER, DelHeat.INTAKE
-local SUPPORT, TAP = DelHeat.SUPPORT, DelHeat.TAP
+local SUPPORT, TAP, COLD = DelHeat.SUPPORT, DelHeat.TAP, DelHeat.COLD
+local HOT_WATER, COLD_WATER = DelHeat.HOT_WATER, DelHeat.COLD_WATER
 
 local Commands = {}
 
@@ -196,33 +197,33 @@ local function intakeWorks(intake, needsPower)
 	return not needsPower or intake.powered == true
 end
 
--- The sides the cell takes a pipe on (DelHeat.sidesOf): all four for a pipe
--- and a heat unit, the axis of a pump, the outlets of a boiler or an intake.
-local function sidesAt(s, key)
+-- What a side of the cell takes (DelHeat.sideMedium): nil, "h", "c", "*".
+local function sideAt(s, key, bit)
 	local kind = s.nodes[key]
-	if not kind then return 0 end
+	if not kind then return nil end
 	if kind == BOILER or kind == INTAKE then
 		local anchor = s.cells[key]
-		if not anchor then return 0 end
+		if not anchor then return nil end
 		local ax, ay = DelHeat.unkey(anchor)
 		local x, y = DelHeat.unkey(key)
 		local boiler = s.boilers[anchor]
-		return DelHeat.sidesOf(kind, boiler and boiler.facing, x - ax, y - ay)
+		return DelHeat.sideMedium(kind, boiler and boiler.facing, x - ax, y - ay, bit)
 	end
-	return DelHeat.sidesOf(kind, s.pumpFacing[key])
+	return DelHeat.sideMedium(kind, s.pumpFacing[key], 0, 0, bit)
 end
 
 local function carries(kind)
-	return kind == PIPE or kind == PUMP or kind == INLET or kind == TAP
+	return DelHeat.kindMedium(kind) ~= nil
 end
 
--- Water leaves the start cells with `reach` cells ahead of it and runs
--- through pipes, pumps and heat units; a working pump on the way sends it
--- on for pumpReach more. In the plane it passes only where both cells take
--- a pipe on the side they share; up and down, from pipe to pipe. Returns
--- best[cell] = the most cells still ahead of the water there, and the
--- structures (by anchor) the water arrives at.
-local function flood(s, starts, reach, pumpReach, needsPower)
+-- Water of a medium ("h" from a boiler, "c" from an intake) leaves the start
+-- cells with `reach` cells ahead of it and runs through the pipes, pumps and
+-- units of its medium; a working pump on the way sends it on for pumpReach
+-- more. In the plane it passes only where both sides the cells share let
+-- its medium through; up and down, between cells whose medium lets it.
+-- Returns best[cell] = the most cells still ahead of the water there, and
+-- the structures (by anchor) the water arrives at.
+local function flood(s, starts, reach, pumpReach, needsPower, medium)
 	local nodes = s.nodes
 	local best, touched, queue, head = {}, {}, {}, 1
 	for _, cell in ipairs(starts) do
@@ -252,17 +253,16 @@ local function flood(s, starts, reach, pumpReach, needsPower)
 		local left = best[key]
 		if left > 0 then
 			local x, y, z = DelHeat.unkey(key)
-			local sides = sidesAt(s, key)
 			for _, dir in ipairs(DelHeat.DIRS) do
-				if DelHeat.hasSide(sides, dir.bit) then
+				if DelHeat.lets(sideAt(s, key, dir.bit), medium) then
 					local nkey = DelHeat.key(x + dir.dx, y + dir.dy, z)
-					if DelHeat.hasSide(sidesAt(s, nkey), dir.back) then enter(nkey, left) end
+					if DelHeat.lets(sideAt(s, nkey, dir.back), medium) then enter(nkey, left) end
 				end
 			end
-			if carries(nodes[key]) then
+			if DelHeat.lets(DelHeat.kindMedium(nodes[key]), medium) then
 				for dz = -1, 1, 2 do
 					local nkey = DelHeat.key(x, y, z + dz)
-					if carries(nodes[nkey]) then enter(nkey, left) end
+					if DelHeat.lets(DelHeat.kindMedium(nodes[nkey]), medium) then enter(nkey, left) end
 				end
 			end
 		end
@@ -286,7 +286,7 @@ local function rebuild(s)
 	for bkey, boiler in pairs(s.boilers) do
 		local bx, by, bz = DelHeat.unkey(bkey)
 		local best = flood(s, structCells(bx, by, bz, DelHeat.sizeOf(BOILER, boiler.facing)),
-			DelHeat.boilerReach(), pumpReach, needsPower)
+			DelHeat.boilerReach(), pumpReach, needsPower, HOT_WATER)
 		local fed, count = {}, 0
 		for key, ahead in pairs(best) do
 			if (heat[key] or -1) < ahead then heat[key] = ahead end
@@ -313,7 +313,7 @@ local function rebuild(s)
 		if intakeWorks(intake, needsPower) then
 			local ix, iy, iz = DelHeat.unkey(ikey)
 			local best, touched = flood(s, structCells(ix, iy, iz, DelHeat.sizeOf(INTAKE)),
-				DelHeat.intakeReach(), pumpReach, needsPower)
+				DelHeat.intakeReach(), pumpReach, needsPower, COLD_WATER)
 			for key, ahead in pairs(best) do
 				if (water[key] or -1) < ahead then water[key] = ahead end
 			end
@@ -435,20 +435,23 @@ local function wantedSprites(s, x, y, z)
 	if kind == RADIATOR then return { DelHeat.radiatorSprite(s.rads[key]) } end
 	if kind == SUPPORT then return { DelHeat.supportSprite() } end
 	local list = {}
-	-- A pump's sprite carries its own length of pipe; a pipe and a heat unit
-	-- show an arm to every neighbour that takes a pipe from this side.
+	local medium = DelHeat.kindMedium(kind)
+	-- A pump's sprite carries its own length of pipe; a pipe and a unit show
+	-- an arm to every neighbour that joins it from this side.
 	if kind ~= PUMP then
 		local mask = 0
 		for _, dir in ipairs(DelHeat.DIRS) do
-			if DelHeat.hasSide(sidesAt(s, DelHeat.key(x + dir.dx, y + dir.dy, z)), dir.back) then
+			if DelHeat.joins(medium, sideAt(s, DelHeat.key(x + dir.dx, y + dir.dy, z), dir.back)) then
 				mask = mask + dir.bit
 			end
 		end
-		if kind == PIPE or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask)) end
+		if DelHeat.isPipeKind(kind) or mask > 0 then table.insert(list, DelHeat.pipeSprite(mask, medium)) end
 	end
-	-- The pipe goes on up to the cell above.
-	local above = s.nodes[DelHeat.key(x, y, z + 1)]
-	if above == PIPE or above == PUMP or above == INLET or above == TAP then table.insert(list, DelHeat.riserSprite()) end
+	-- The pipe goes on up to the cell above, in the colour of the pipe.
+	local above = DelHeat.kindMedium(s.nodes[DelHeat.key(x, y, z + 1)])
+	if DelHeat.joins(medium, above) then
+		table.insert(list, DelHeat.riserSprite(medium == DelHeat.ANY_WATER and above or medium))
+	end
 	if kind == PUMP then table.insert(list, DelHeat.pumpSprite(s.pumpFacing[key])) end
 	if kind == INLET then table.insert(list, DelHeat.inletSprite(s.inlets[key])) end
 	if kind == TAP then table.insert(list, DelHeat.tapSprite(s.taps[key] and s.taps[key].facing)) end
@@ -575,9 +578,9 @@ function Commands.place(player, args)
 	end
 
 	for _, cell in ipairs(cells) do
-		local square = squareAt(cell.x, cell.y, cell.z, name == "pipe")
+		local square = squareAt(cell.x, cell.y, cell.z, DelHeat.isPipeName(name))
 		local why
-		if name == "pipe" or name == "radiator" or name == "inlet" or name == "support" or name == "tap" then
+		if DelHeat.isPipeName(name) or name == "radiator" or name == "inlet" or name == "support" or name == "tap" then
 			why = blockedThin(s, square, cell.x, cell.y, cell.z, name)
 		else
 			why = blockedSolid(s, square, cell.x, cell.y, cell.z)
@@ -623,6 +626,8 @@ function Commands.place(player, args)
 			s.rads[ckey] = facing
 		elseif name == "support" then
 			s.nodes[ckey] = SUPPORT
+		elseif name == "coldpipe" then
+			s.nodes[ckey] = COLD
 		else
 			s.nodes[ckey] = PIPE
 		end
@@ -634,8 +639,8 @@ function Commands.place(player, args)
 end
 
 -- The run of a line command: who, state, cells; nil after telling why not.
-local function lineOf(player, args)
-	local who = builderOf(player, "pipe")
+local function lineOf(player, args, name)
+	local who = builderOf(player, name)
 	if not who then return nil end
 	local x1, y1, z = coords(args, "x1", "y1")
 	local x2, y2 = coords(args, "x2", "y2")
@@ -652,31 +657,33 @@ local function lineOf(player, args)
 	return who, state(), path(x1, y1, x2, y2, z)
 end
 
--- { x1, y1, x2, y2, z }: pipes along x, then along y. Cells that already
--- hold something are passed over; the run stops at the first cell that
--- takes no pipe, or when the player's pipes run out.
+-- { x1, y1, x2, y2, z, kind = "pipe" | "coldpipe" }: pipes along x, then
+-- along y. Cells that already hold something are passed over; the run stops
+-- at the first cell that takes no pipe, or when the player's pipes run out.
 function Commands.line(player, args)
-	local who, s, cells = lineOf(player, args)
+	local name = args.kind == "coldpipe" and "coldpipe" or "pipe"
+	local kind = name == "coldpipe" and COLD or PIPE
+	local who, s, cells = lineOf(player, args, name)
 	if not who then return end
-	local have = who == "player" and DelHeat.countOf(player, DelHeat.ITEM.pipe) or nil
+	local have = who == "player" and DelHeat.countOf(player, DelHeat.ITEM[name]) or nil
 	local laid, stopped = {}, nil
 	for _, cell in ipairs(cells) do
 		local key = DelHeat.key(cell.x, cell.y, cell.z)
 		if not s.nodes[key] then
 			local square = squareAt(cell.x, cell.y, cell.z, true)
-			local why = blockedThin(s, square, cell.x, cell.y, cell.z, "pipe")
+			local why = blockedThin(s, square, cell.x, cell.y, cell.z, name)
 			if not why and who == "player" and foreign(player, square) then why = "IGUI_DelHeat_Safehouse" end
 			if not why and have and #laid >= have then why = "IGUI_DelHeat_NeedItem" end
 			if why then
 				stopped = why
 				break
 			end
-			s.nodes[key] = PIPE
+			s.nodes[key] = kind
 			table.insert(laid, cell)
 		end
 	end
 	if #laid > 0 then
-		if who == "player" then takeItems(player, DelHeat.ITEM.pipe, #laid) end
+		if who == "player" then takeItems(player, DelHeat.ITEM[name], #laid) end
 		redrawAround(s, laid)
 		changed(s)
 		log(string.format("Pipes laid: %s (%s) %d to %d,%d,%d", player:getUsername(), who, #laid,
@@ -689,23 +696,29 @@ function Commands.line(player, args)
 	end
 end
 
--- { x1, y1, x2, y2, z }: takes the pipes off the same run; devices stay.
+-- { x1, y1, x2, y2, z }: takes the pipes of both kinds off the same run;
+-- devices stay.
 function Commands.unline(player, args)
-	local who, s, cells = lineOf(player, args)
+	local who, s, cells = lineOf(player, args, "pipe")
 	if not who then return end
-	local taken = {}
+	local taken, hot, cold = {}, 0, 0
 	for _, cell in ipairs(cells) do
 		local key = DelHeat.key(cell.x, cell.y, cell.z)
-		if s.nodes[key] == PIPE then
+		local kind = s.nodes[key]
+		if DelHeat.isPipeKind(kind) then
 			-- An unloaded square would keep its sprite: stop there.
 			local square = getCell():getGridSquare(cell.x, cell.y, cell.z)
 			if not square or (who == "player" and foreign(player, square)) then break end
 			s.nodes[key] = nil
 			table.insert(taken, cell)
+			if kind == COLD then cold = cold + 1 else hot = hot + 1 end
 		end
 	end
 	if #taken > 0 then
-		if who == "player" then giveItems(player, DelHeat.ITEM.pipe, #taken) end
+		if who == "player" then
+			if hot > 0 then giveItems(player, DelHeat.ITEM.pipe, hot) end
+			if cold > 0 then giveItems(player, DelHeat.ITEM.coldpipe, cold) end
+		end
 		redrawAround(s, taken)
 		changed(s)
 		log(string.format("Pipes removed: %s (%s) %d to %d,%d,%d", player:getUsername(), who, #taken,

@@ -18,6 +18,7 @@ IG = {
     "Kind_intake": ("Water intake", "Водозабор", "Водозабір"),
     "Kind_support": ("Pipe support", "Опора трубы", "Опора труби"),
     "Kind_tap": ("Water unit", "Узел водоснабжения", "Вузол водопостачання"),
+    "Kind_coldpipe": ("Cold water pipe", "Труба холодной воды", "Труба холодної води"),
     "TapFed": ("Water from an intake reaches it", "Вода от водозабора подведена", "Воду від водозабору підведено"),
     "TapDry": ("No water from an intake reaches it", "Вода от водозабора не доходит", "Вода від водозабору не доходить"),
     "TapTank": ("Tank: %1 of %2 l", "Бак: %1 из %2 л", "Бак: %1 з %2 л"),
@@ -177,6 +178,7 @@ ITEMS = {
     "DelHeat.Radiator": ("Radiator", "Радиатор", "Радіатор"),
     "DelHeat.Support": ("Pipe Support", "Опора трубы", "Опора труби"),
     "DelHeat.WaterUnit": ("Water Unit", "Узел водоснабжения", "Вузол водопостачання"),
+    "DelHeat.ColdPipe": ("Cold Water Pipe", "Труба холодной воды", "Труба холодної води"),
     "DelHeat.Inlet": ("Heat Unit", "Тепловой узел", "Тепловий вузол"),
     "DelHeat.Pump": ("Pump Station", "Насосная станция", "Насосна станція"),
     "DelHeat.Intake": ("Water Intake Kit", "Комплект водозабора", "Комплект водозабору"),
@@ -188,6 +190,7 @@ RECIPES = {
     "MakeHeatingRadiator": ("Make a Radiator", "Сделать радиатор", "Зробити радіатор"),
     "MakePipeSupport": ("Make a Pipe Support", "Сварить опору трубы", "Зварити опору труби"),
     "MakeWaterUnit": ("Make a Water Unit", "Собрать узел водоснабжения", "Зібрати вузол водопостачання"),
+    "MakeColdPipe": ("Make Cold Water Pipes", "Сделать трубы холодной воды", "Зробити труби холодної води"),
     "MakeHeatUnit": ("Make a Heat Unit", "Собрать тепловой узел", "Зібрати тепловий вузол"),
     "MakeHeatingPump": ("Make a Pump Station", "Собрать насосную станцию", "Зібрати насосну станцію"),
     "MakeWaterIntake": ("Make a Water Intake Kit", "Собрать комплект водозабора", "Зібрати комплект водозабору"),
@@ -215,9 +218,13 @@ def net(en, ru, ua):
 
 TOOLTIPS = {
     "Tooltip_DelHeat_Pipe": net(
-        "Lies on the ground and carries the water. Laid one by one, or as a run: hold the button and drag. Above the ground it needs no floor: lay it out into the air from an upper floor, or press R and lay it a level up from the ground.",
-        "Лежит на земле и несёт воду. Кладётся по одной или трассой: зажмите кнопку и протяните. Выше земли пол не нужен: ведите трассу в воздух с верхнего этажа или нажмите R и кладите этажом выше прямо с земли.",
-        "Лежить на землі й несе воду. Кладеться по одній або трасою: затисніть кнопку й протягніть. Вище землі підлога не потрібна: ведіть трасу в повітря з верхнього поверху або натисніть R і кладіть поверхом вище просто із землі."),
+        "Carries the hot water from a boiler house to the heat units; does not join a cold water pipe. Laid one by one, or as a run: hold the button and drag. Above the ground it needs no floor: lay it out into the air from an upper floor, or press R and lay it a level up from the ground.",
+        "Несёт горячую воду от котельной к тепловым узлам; с трубой холодной воды не стыкуется. Кладётся по одной или трассой: зажмите кнопку и протяните. Выше земли пол не нужен: ведите трассу в воздух с верхнего этажа или нажмите R и кладите этажом выше прямо с земли.",
+        "Несе гарячу воду від котельні до теплових вузлів; з трубою холодної води не стикується. Кладеться по одній або трасою: затисніть кнопку й протягніть. Вище землі підлога не потрібна: ведіть трасу в повітря з верхнього поверху або натисніть R і кладіть поверхом вище просто із землі."),
+    "Tooltip_DelHeat_ColdPipe": net(
+        "Painted blue. Carries the cold water from a water intake to the boiler houses and the water units; does not join a heating pipe. Laid like a heating pipe, on the ground or a level up.",
+        "Синяя. Несёт холодную воду от водозабора к котельным и узлам водоснабжения; с трубой отопления не стыкуется. Кладётся как труба отопления, по земле или этажом выше.",
+        "Синя. Несе холодну воду від водозабору до котелень і вузлів водопостачання; з трубою опалення не стикується. Кладеться як труба опалення, по землі або поверхом вище."),
     "Tooltip_DelHeat_Support": net(
         "A steel lattice post one level high. Stands on the ground under a pipe laid a level up. Only for the look.",
         "Стальная решётчатая опора высотой в этаж. Ставится на землю под трубу, проложенную этажом выше. Только для вида.",
@@ -227,25 +234,25 @@ TOOLTIPS = {
         "Греет комнату, если рядом есть тепловой узел с горячей водой. Своя труба не нужна.",
         "Гріє кімнату, якщо поруч є тепловий вузол з гарячою водою. Своя труба не потрібна."),
     "Tooltip_DelHeat_Inlet": net(
-        "Stands at a wall of a house on the end of a pipe and feeds the radiators around it.",
-        "Ставится у стены дома на конце трубы и питает радиаторы вокруг себя.",
-        "Ставиться біля стіни будинку на кінці труби й живить радіатори навколо себе."),
+        "Stands at a wall of a house on the end of a heating pipe and feeds the radiators around it.",
+        "Ставится у стены дома на конце трубы отопления и питает радиаторы вокруг себя.",
+        "Ставиться біля стіни будинку на кінці труби опалення й живить радіатори навколо себе."),
     "Tooltip_DelHeat_WaterUnit": net(
-        "Stands at a wall of a house on a pipe from a water intake. Keeps a tank of water and tops up the sinks, toilets and baths around it; nothing needs to be plumbed.",
-        "Ставится у стены дома на трубе от водозабора. Держит бак воды и доливает раковины, унитазы и ванны вокруг себя; подключать их не нужно.",
-        "Ставиться біля стіни будинку на трубі від водозабору. Тримає бак води й доливає раковини, унітази й ванни навколо себе; підключати їх не потрібно."),
+        "Stands at a wall of a house on a cold water pipe from a water intake. Keeps a tank of water and tops up the sinks, toilets and baths around it; nothing needs to be plumbed.",
+        "Ставится у стены дома на трубе холодной воды от водозабора. Держит бак воды и доливает раковины, унитазы и ванны вокруг себя; подключать их не нужно.",
+        "Ставиться біля стіни будинку на трубі холодної води від водозабору. Тримає бак води й доливає раковини, унітази й ванни навколо себе; підключати їх не потрібно."),
     "Tooltip_DelHeat_Pump": net(
         "Sends the water further along the pipe. Carries its own length of pipe and joins pipes only at its two ends: turn it along the line. Needs electricity.",
         "Гонит воду дальше по трубе. Идёт со своим отрезком трубы и стыкуется только двумя концами: поверните её вдоль линии. Нужно электричество.",
         "Жене воду далі трубою. Має власний відрізок труби й стикується лише двома кінцями: поверніть її вздовж лінії. Потрібна електрика."),
     "Tooltip_DelHeat_Intake": net(
-        "2x2 cells by a river or a lake: pumps water into the pipes to a boiler house. A pipe joins it only at its outlet. Needs electricity.",
-        "2x2 клетки у реки или озера: качает воду по трубам к котельной. Труба стыкуется только с её выходом. Нужно электричество.",
-        "2x2 клітинки біля річки чи озера: качає воду трубами до котельні. Труба стикується лише з її виходом. Потрібна електрика."),
+        "2x2 cells by a river or a lake: pumps water into the cold water pipes to the boiler houses and water units. A pipe joins it only at its outlet. Needs electricity.",
+        "2x2 клетки у реки или озера: качает воду по трубам холодной воды к котельным и узлам водоснабжения. Труба стыкуется только с её выходом. Нужно электричество.",
+        "2x2 клітинки біля річки чи озера: качає воду трубами холодної води до котелень і вузлів водопостачання. Труба стикується лише з її виходом. Потрібна електрика."),
     "Tooltip_DelHeat_Boiler": net(
-        "2x3 cells: burns fuel and heats the water for a whole neighbourhood. Pipes join it only at the two outlets by its tank.",
-        "2x3 клетки: жжёт топливо и греет воду на целый район. Трубы стыкуются только с двумя выходами у бака.",
-        "2x3 клітинки: палить паливо й гріє воду на цілий район. Труби стикуються лише з двома виходами біля бака."),
+        "2x3 cells: burns fuel and heats the water for a whole neighbourhood. Pipes join it only at the two outlets by its tank: the blue one takes the cold water pipe, the other gives the hot water to the heating pipe.",
+        "2x3 клетки: жжёт топливо и греет воду на целый район. Трубы стыкуются только с двумя выходами у бака: к синему — труба холодной воды, от другого — труба отопления.",
+        "2x3 клітинки: палить паливо й гріє воду на цілий район. Труби стикуються лише з двома виходами біля бака: до синього — труба холодної води, від іншого — труба опалення."),
 }
 
 SANDBOX = {

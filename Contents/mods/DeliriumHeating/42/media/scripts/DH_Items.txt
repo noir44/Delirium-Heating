@@ -19,6 +19,16 @@ module DelHeat
 		Tooltip = Tooltip_DelHeat_Pipe,
 	}
 
+	item ColdPipe
+	{
+		DisplayName = Cold Water Pipe,
+		DisplayCategory = Material,
+		ItemType = base:normal,
+		Weight = 2.0,
+		Icon = DelHeatColdPipe,
+		Tooltip = Tooltip_DelHeat_ColdPipe,
+	}
+
 	item Support
 	{
 		DisplayName = Pipe Support,

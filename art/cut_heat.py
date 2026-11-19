@@ -32,6 +32,8 @@ INLET = {"N": 17, "W": 38, "S": 39, "E": 40}
 RISER = 41
 SUPPORT = 43
 TAP = {"N": 44, "W": 45, "S": 46, "E": 47}
+COLD = 48
+COLD_RISER = 64
 # One level up is 192 px at 2x.
 LEVEL = 192
 RADIATOR = {"N": 18, "W": 19, "S": 20, "E": 21}
@@ -192,7 +194,10 @@ def tiles_json():
     for first, wide, deep in STRUCTURES.values():
         for cell in range(wide * deep):
             add(first + cell, SOLID)
-    spec = {"pack": "delheat", "tileset": TILESET, "columns": 8, "rows": 8, "tiles": tiles}
+    for mask in range(16):
+        add(COLD + mask)
+    add(COLD_RISER)
+    spec = {"pack": "delheat", "tileset": TILESET, "columns": 8, "rows": 9, "tiles": tiles}
     with open(os.path.join(HERE, "tiles.json"), "w", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(spec, indent=2) + "\n")
 
@@ -201,6 +206,8 @@ def main():
     os.makedirs(FRAMES, exist_ok=True)
     for mask in range(16):
         single(f"pipe_{mask}", mask)
+        single(f"coldpipe_{mask}", COLD + mask)
+    single("coldriser", COLD_RISER)
     single("pump", PUMP["E"])
     single("pump_S", PUMP["S"])
     single("riser", RISER)
@@ -216,6 +223,7 @@ def main():
     tiles_json()
 
     icon(frame(10), "Pipe")
+    icon(frame(COLD + 10), "ColdPipe")
     icon(frame(RADIATOR["N"]), "Radiator")
     icon(frame(SUPPORT), "Support")
     icon(frame(INLET["N"]), "Inlet")

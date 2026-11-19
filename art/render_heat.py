@@ -107,6 +107,7 @@ M = {}
 
 def materials():
     M["steel"] = mottled("Steel", (0.30, 0.31, 0.32), (0.34, 0.20, 0.13), 9.0, 0.55, 0.75, 0.56)
+    M["cold"] = mottled("ColdPipe", (0.13, 0.27, 0.47), (0.30, 0.21, 0.15), 9.0, 0.5, 0.35, 0.64)
     M["dark"] = mottled("DarkIron", (0.10, 0.10, 0.11), (0.20, 0.13, 0.09), 6.0, 0.6, 0.7, 0.6)
     M["soot"] = mottled("Soot", (0.16, 0.16, 0.17), (0.07, 0.07, 0.07), 3.0, 0.75, 0.5, 0.5)
     M["cream"] = mottled("Cream", (0.66, 0.63, 0.55), (0.48, 0.42, 0.33), 14.0, 0.55, 0.0, 0.60)
@@ -223,18 +224,19 @@ ARMS = {1: Vector((0, 1, 0)), 2: Vector((1, 0, 0)), 4: Vector((0, -1, 0)), 8: Ve
 OVERLAP = 0.03
 
 
-def build_pipe(mask):
+def build_pipe(mask, paint="steel"):
+    # paint "cold": the cold water pipe, painted blue.
     if mask == 0:
         # A lone piece: a short length with a band on each end.
         a, b = CENTRE + Vector((-0.3, 0, 0)), CENTRE + Vector((0.3, 0, 0))
-        cyl(a, b, R_PIPE, M["steel"])
+        cyl(a, b, R_PIPE, M[paint])
         cyl(a, a + Vector((0.05, 0, 0)), R_PIPE * 1.22, M["dark"])
         cyl(b - Vector((0.05, 0, 0)), b, R_PIPE * 1.22, M["dark"])
         return
-    ball(CENTRE, R_PIPE, M["steel"])
+    ball(CENTRE, R_PIPE, M[paint])
     for bit, direction in ARMS.items():
         if mask & bit:
-            cyl(CENTRE, CENTRE + direction * (0.5 + OVERLAP), R_PIPE, M["steel"])
+            cyl(CENTRE, CENTRE + direction * (0.5 + OVERLAP), R_PIPE, M[paint])
             # A coupling band half way along the arm.
             cyl(CENTRE + direction * 0.235, CENTRE + direction * 0.285, R_PIPE * 1.2, M["dark"])
     # A straight run through needs no joint to show; a bend or a tee gets a collar.
@@ -296,7 +298,7 @@ def build_pump(degrees):
     transform(turn_about((0.5, -0.5, 0), degrees))
 
 
-def build_inlet(degrees, body="green", valve="red"):
+def build_inlet(degrees, body="green", valve="red", paint="steel"):
     # The water unit is the same cabinet painted blue, with white handles.
     # Heat unit: a cabinet at the north edge of the cell (turned for the
     # other three walls), fed by two pipes from the main in the middle of
@@ -305,9 +307,9 @@ def build_inlet(degrees, body="green", valve="red"):
     y = -0.19
     box(0.24, 0.76, -0.34, -0.04, 0.0, 0.06, M["concrete"])
     for x in (0.45, 0.55):
-        cyl((x, -0.5, Z_PIPE), (x, y, Z_PIPE), 0.042, M["steel"], 16)
-        ball((x, y, Z_PIPE), 0.042, M["steel"])
-        cyl((x, y, Z_PIPE), (x, y, 0.32), 0.042, M["steel"], 16)
+        cyl((x, -0.5, Z_PIPE), (x, y, Z_PIPE), 0.042, M[paint], 16)
+        ball((x, y, Z_PIPE), 0.042, M[paint])
+        cyl((x, y, Z_PIPE), (x, y, 0.32), 0.042, M[paint], 16)
     box(0.29, 0.71, y - 0.11, y + 0.11, 0.30, 0.92, M[body])
     box(0.32, 0.68, y - 0.125, y - 0.11, 0.35, 0.87, M["steel"])
     box(0.63, 0.66, y - 0.135, y - 0.125, 0.55, 0.67, M["dark"])
@@ -323,9 +325,9 @@ def build_inlet(degrees, body="green", valve="red"):
 LEVEL = 192 / (PX_PER_UNIT * math.cos(math.radians(30)))
 
 
-def build_riser():
+def build_riser(paint="steel"):
     # The pipe going up to the pipe of the cell above.
-    cyl(CENTRE, CENTRE + Vector((0, 0, LEVEL)), R_PIPE, M["steel"])
+    cyl(CENTRE, CENTRE + Vector((0, 0, LEVEL)), R_PIPE, M[paint])
     for z in (0.45, 1.25, 2.05):
         cyl(CENTRE + Vector((0, 0, z)), CENTRE + Vector((0, 0, z + 0.05)), R_PIPE * 1.2, M["dark"])
     ball(CENTRE, R_PIPE * 1.25, M["dark"])
@@ -366,7 +368,7 @@ def build_intake():
                         @ Matrix.Translation(Vector((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z))))
     south = -1.0 - (hi.y - lo.y) / 2 * k
     print("INTAKE pad south face at y =", round(south, 3), "height", round((hi.z - lo.z) * k, 3))
-    cyl((1.5, south + 0.06, Z_PIPE), (1.5, -2.0, Z_PIPE), R_PIPE, M["steel"])
+    cyl((1.5, south + 0.06, Z_PIPE), (1.5, -2.0, Z_PIPE), R_PIPE, M["cold"])
     cyl((1.5, south - 0.01, Z_PIPE), (1.5, south - 0.05, Z_PIPE), R_PIPE * 1.25, M["dark"])
 
 
@@ -416,8 +418,9 @@ def build_boiler(facing):
     ball((2.51, -1.45, zd), 0.06, M["steel"])
     ball((2.51, -1.0, zd), 0.06, M["steel"])
     # Supply and return leaving the tank at ground level.
+    # Hot out to the east, cold in from the south (DelHeat.BOILER_PORTS).
     cyl((2.51, -1.45, Z_PIPE), (2.97, -1.45, Z_PIPE), R_PIPE, M["steel"])
-    cyl((2.51, -1.45, Z_PIPE), (2.51, -1.97, Z_PIPE), R_PIPE, M["steel"])
+    cyl((2.51, -1.45, Z_PIPE), (2.51, -1.97, Z_PIPE), R_PIPE, M["cold"])
     if facing == "E":
         # Front to the east: x 0..2, y -3..0.
         transform(Matrix.Translation(Vector((0, -3, 0))) @ Matrix.Rotation(math.radians(90), 4, "Z"))
@@ -583,11 +586,14 @@ for mask in range(16):
 shoot("pump", lambda: build_pump(0), 256, 96)
 shoot("pump_S", lambda: build_pump(270), 256, 96)
 shoot("riser", build_riser, 256, 96)
+for mask in range(16):
+    shoot("coldpipe_%d" % mask, lambda: build_pipe(mask, "cold"), 256, 96)
+shoot("coldriser", lambda: build_riser("cold"), 256, 96)
 shoot("support", build_support, 256, 96)
 for facing, degrees in (("N", 0), ("W", 90), ("S", 180), ("E", 270)):
     shoot("radiator_" + facing, lambda: build_radiator(degrees), 256, 96)
     shoot("inlet_" + facing, lambda: build_inlet(degrees), 256, 96)
-    shoot("tap_" + facing, lambda: build_inlet(degrees, "blue", "white"), 256, 96)
+    shoot("tap_" + facing, lambda: build_inlet(degrees, "blue", "white", "cold"), 256, 96)
 # The boilers and the intake: a 384x384 image of the 3x3 cells around, as in
 # Delirium-Mines.
 for facing in ("S", "E"):

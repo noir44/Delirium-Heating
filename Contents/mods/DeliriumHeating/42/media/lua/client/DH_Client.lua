@@ -262,9 +262,9 @@ end
 -- ---------------------------------------------------------------------------
 
 DelHeat.TIME = { pipe = 80, radiator = 200, inlet = 250, pump = 300, intake = 500, boiler = 800, support = 150,
-	tap = 250 }
+	tap = 250, coldpipe = 80 }
 -- The parts in the order the menu shows them.
-DelHeat.PARTS = { "pipe", "support", "radiator", "inlet", "tap", "pump", "intake", "boiler" }
+DelHeat.PARTS = { "pipe", "coldpipe", "support", "radiator", "inlet", "tap", "pump", "intake", "boiler" }
 
 -- cells: where the work is ({ x, y, z }), best first - the cell built on,
 -- or the two ends of a run.
@@ -356,7 +356,7 @@ local function onFill(playerNum, context, worldobjects, test)
 		local sq = object:getSquare()
 		local found = DelHeat.nodeAt(sq)
 		if sq and not square then square = sq end
-		if found and (not node or (node.kind == PIPE and found.kind ~= PIPE)) then
+		if found and (not node or (DelHeat.isPipeKind(node.kind) and not DelHeat.isPipeKind(found.kind))) then
 			square, node = sq, found
 		end
 	end

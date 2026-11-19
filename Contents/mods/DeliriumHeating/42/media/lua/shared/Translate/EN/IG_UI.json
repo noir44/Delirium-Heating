@@ -7,6 +7,7 @@
 	"IGUI_DelHeat_Kind_intake": "Water intake",
 	"IGUI_DelHeat_Kind_support": "Pipe support",
 	"IGUI_DelHeat_Kind_tap": "Water unit",
+	"IGUI_DelHeat_Kind_coldpipe": "Cold water pipe",
 	"IGUI_DelHeat_TapFed": "Water from an intake reaches it",
 	"IGUI_DelHeat_TapDry": "No water from an intake reaches it",
 	"IGUI_DelHeat_TapTank": "Tank: %1 of %2 l",

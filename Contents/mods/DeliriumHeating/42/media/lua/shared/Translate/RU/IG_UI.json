@@ -7,6 +7,7 @@
 	"IGUI_DelHeat_Kind_intake": "Водозабор",
 	"IGUI_DelHeat_Kind_support": "Опора трубы",
 	"IGUI_DelHeat_Kind_tap": "Узел водоснабжения",
+	"IGUI_DelHeat_Kind_coldpipe": "Труба холодной воды",
 	"IGUI_DelHeat_TapFed": "Вода от водозабора подведена",
 	"IGUI_DelHeat_TapDry": "Вода от водозабора не доходит",
 	"IGUI_DelHeat_TapTank": "Бак: %1 из %2 л",

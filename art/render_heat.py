@@ -107,7 +107,7 @@ M = {}
 
 def materials():
     M["steel"] = mottled("Steel", (0.30, 0.31, 0.32), (0.34, 0.20, 0.13), 9.0, 0.55, 0.75, 0.56)
-    M["cold"] = mottled("ColdPipe", (0.13, 0.27, 0.47), (0.30, 0.21, 0.15), 9.0, 0.5, 0.35, 0.64)
+    M["cold"] = mottled("ColdPipe", (0.22, 0.28, 0.35), (0.34, 0.20, 0.13), 9.0, 0.5, 0.6, 0.58)
     M["dark"] = mottled("DarkIron", (0.10, 0.10, 0.11), (0.20, 0.13, 0.09), 6.0, 0.6, 0.7, 0.6)
     M["soot"] = mottled("Soot", (0.16, 0.16, 0.17), (0.07, 0.07, 0.07), 3.0, 0.75, 0.5, 0.5)
     M["cream"] = mottled("Cream", (0.66, 0.63, 0.55), (0.48, 0.42, 0.33), 14.0, 0.55, 0.0, 0.60)
@@ -225,7 +225,7 @@ OVERLAP = 0.03
 
 
 def build_pipe(mask, paint="steel"):
-    # paint "cold": the cold water pipe, painted blue.
+    # paint "cold": the cold water pipe, steel with a bluish-grey tint.
     if mask == 0:
         # A lone piece: a short length with a band on each end.
         a, b = CENTRE + Vector((-0.3, 0, 0)), CENTRE + Vector((0.3, 0, 0))

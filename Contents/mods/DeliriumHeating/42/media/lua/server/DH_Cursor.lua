@@ -37,12 +37,20 @@ local FACINGS = {
 -- calls (a few a frame).
 local RECHECK = 30
 
+-- The ghost is the tile's own shared sprite (getSprite, as ISDestroyCursor
+-- draws the objects it marks): the one placed parts are drawn with. A bare
+-- IsoSprite.new() + LoadSingleTexture showed nothing in game for the sprites
+-- 43 and up (support, water unit, cold water pipe) while the same tiles put
+-- down were seen; the bare sprite stays only as a fallback.
 local ghosts = {}
 local function ghost(name)
 	local sprite = ghosts[name]
 	if not sprite then
-		sprite = IsoSprite.new()
-		sprite:LoadSingleTexture(name)
+		sprite = getSprite(name)
+		if not sprite then
+			sprite = IsoSprite.new()
+			sprite:LoadSingleTexture(name)
+		end
 		ghosts[name] = sprite
 	end
 	return sprite

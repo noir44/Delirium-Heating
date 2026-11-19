@@ -2,6 +2,10 @@
 -- on its short list of exceptions (ISDestroyCursor:canDestroy), a pipe or a
 -- boiler included, and the network would not know. Only an admin removes
 -- them, from the context menu.
+--
+-- Client UI, but it lives in server/ next to ISDestroyCursor: on connecting
+-- client/ is loaded before server/, and from client/ the require below
+-- failed ("attempted index: canDestroy of non-table").
 
 if isServer() then return end
 

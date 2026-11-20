@@ -31,7 +31,7 @@
 	"Sandbox_DelHeat_InletRadius": "Heat unit radius, cells",
 	"Sandbox_DelHeat_InletRadius_tooltip": "Radiators this close to a heat unit with hot water work, three floors up and down.",
 	"Sandbox_DelHeat_TapClean": "Water units give clean water",
-	"Sandbox_DelHeat_TapClean_tooltip": "On: the sinks, toilets and baths get clean water. Off: river water as it is, to be boiled before drinking.",
+	"Sandbox_DelHeat_TapClean_tooltip": "On: the sinks, toilets and baths get clean water. Off: river water as it is, to be boiled before drinking. Only a fixture with a tank of its own can hold river water: the ordinary ones of the map always give clean water.",
 	"Sandbox_DelHeat_TapRadius": "Water unit radius, cells",
 	"Sandbox_DelHeat_TapRadius_tooltip": "Sinks, toilets and baths this close to a water unit are topped up from its tank, three floors up and down.",
 	"Sandbox_DelHeat_TapCapacity": "Water unit tank, litres",

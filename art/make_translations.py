@@ -344,9 +344,9 @@ SANDBOX = {
     "TapClean": ("Water units give clean water", "Узлы водоснабжения дают чистую воду",
                  "Вузли водопостачання дають чисту воду"),
     "TapClean_tooltip": (
-        "On: the sinks, toilets and baths get clean water. Off: river water as it is, to be boiled before drinking.",
-        "Включено — раковины, унитазы и ванны получают чистую воду. Выключено — речную как есть, её надо кипятить.",
-        "Увімкнено — раковини, унітази й ванни отримують чисту воду. Вимкнено — річкову як є, її треба кип'ятити."),
+        "On: the sinks, toilets and baths get clean water. Off: river water as it is, to be boiled before drinking. Only a fixture with a tank of its own can hold river water: the ordinary ones of the map always give clean water.",
+        "Включено — раковины, унитазы и ванны получают чистую воду. Выключено — речную как есть, её надо кипятить. Речную воду держит только сантехника со своим баком: обычная, что стоит на карте, всегда даёт чистую.",
+        "Увімкнено — раковини, унітази й ванни отримують чисту воду. Вимкнено — річкову як є, її треба кип'ятити. Річкову воду тримає лише сантехніка з власним баком: звичайна, що стоїть на мапі, завжди дає чисту."),
     "TapRadius": ("Water unit radius, cells", "Радиус узла водоснабжения, клеток", "Радіус вузла водопостачання, клітинок"),
     "TapRadius_tooltip": (
         "Sinks, toilets and baths this close to a water unit are topped up from its tank, three floors up and down.",

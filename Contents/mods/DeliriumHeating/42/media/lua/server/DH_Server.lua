@@ -1023,19 +1023,56 @@ end
 -- Water units
 -- ---------------------------------------------------------------------------
 
+-- Litres a fixture holds when neither its sprite nor its modData says.
+local FIXTURE_LITRES = 20
+
+local function spriteNumber(props, name)
+	if not props:has(name) then return nil end
+	return tonumber(props:get(name))
+end
+
 -- A sink, a toilet, a bath, a shower: what vanilla lets a player plumb
--- (ISMoveableSpriteProps), with a tank of its own to fill. One plumbed to a
--- barrel upstairs is left to its barrel.
-local function fixtureTank(object)
-	local sprite = object:getSprite()
-	local props = sprite and sprite:getProperties()
-	if not props or not props:has(IsoFlagType.waterPiped) then return nil, false end
-	if object:getUsesExternalWaterSource() then return nil, true end
+-- (sprite flag waterPiped). Tops it up from `water`; returns the litres it
+-- took and whether it takes water at all. One plumbed to a barrel upstairs is
+-- left to its barrel, one on the mains (still on) needs nothing.
+--
+-- Where the water of a fixture lives (javap IsoObject, 2026-11-20): a fluid
+-- container if it has one (rare); otherwise its "reserve" - modData
+-- waterAmount / waterMaxAmount, falling back to the sprite's properties of the
+-- same names. The game reads and spends the reserve itself (getFluidAmount,
+-- useFluid -> setReserveWaterAmount), but only of an "unmoved" fixture:
+-- modData canBeWaterPiped not true. A fixture a player has carried has it
+-- true (ISMoveableSpriteProps) and takes no reserve until plumbed; the unit
+-- plumbs it, as vanilla's ISPlumbItem does, by setting it false. Reserve water
+-- is always clean (getInfiniteWaterType), TapClean only reaches a container.
+local function fillFixture(object, props, water, fluid)
+	if object:getUsesExternalWaterSource() then return 0, false end
+	if object:getFluidCapacity() >= 9999 then return 0, false end
 	local tank = object:getFluidContainer()
-	if not tank or tank:getCapacity() <= 0 then return nil, true end
-	-- Mains water still on: it needs nothing.
-	if object:getFluidCapacity() >= 10000 then return nil, true end
-	return tank, true
+	if tank and tank:getCapacity() > 0 then
+		local before = tank:getAmount()
+		local give = math.min(tank:getCapacity() - before, water)
+		if give < 0.5 then return 0, true end
+		object:emptyFluid()
+		object:addFluid(fluid, before + give)
+		object:transmitModData()
+		return math.max(0, tank:getAmount() - before), true
+	end
+	local md = object:getModData()
+	local moved = md.canBeWaterPiped == true
+	local amount = tonumber(md.waterAmount) or spriteNumber(props, "waterAmount") or 0
+	local max = tonumber(md.waterMaxAmount) or spriteNumber(props, "waterMaxAmount")
+		or tonumber(md.waterAmount) or spriteNumber(props, "waterAmount") or 0
+	if max <= 0 then max = FIXTURE_LITRES end
+	amount = math.max(0, math.min(max, amount))
+	local give = math.min(max - amount, water)
+	if give < 0.5 and not moved and md.waterMaxAmount ~= nil then return 0, true end
+	if give < 0.5 then give = 0 end
+	md.canBeWaterPiped = false
+	md.waterMaxAmount = max
+	md.waterAmount = amount + give
+	object:transmitModData()
+	return give, true
 end
 
 -- Every ten game minutes: the tank takes in what the intake's water brings,
@@ -1058,18 +1095,13 @@ local function serveTap(s, n, key, tap)
 					local objects = square:getObjects()
 					for i = 0, objects:size() - 1 do
 						local object = objects:get(i)
-						local tank, fixture = fixtureTank(object)
-						if fixture then fixtures = fixtures + 1 end
-						if tank then
-							fillable = fillable + 1
-							local before = tank:getAmount()
-							local give = math.min(tank:getCapacity() - before, water)
-							if give >= 0.5 then
-								object:emptyFluid()
-								object:addFluid(fluid, before + give)
-								object:transmitModData()
-								water = water - math.max(0, tank:getAmount() - before)
-							end
+						local sprite = object:getSprite()
+						local props = sprite and sprite:getProperties()
+						if props and props:has(IsoFlagType.waterPiped) then
+							fixtures = fixtures + 1
+							local took, takes = fillFixture(object, props, water, fluid)
+							if takes then fillable = fillable + 1 end
+							water = math.max(0, water - took)
 						end
 					end
 				end
